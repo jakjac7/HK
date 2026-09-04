@@ -1,0 +1,6 @@
+{
+  "name": "HIS KINGDOM",
+  "description": "기독교 공동체 원리를 담은 유기체적 실시간 시뮬레이션 전략 게임 (Organic Real-Time Community Simulation Strategy)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
