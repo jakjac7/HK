@@ -15,7 +15,7 @@ export const ReleaseOverlay: React.FC<ReleaseOverlayProps> = ({ engine }) => {
   const { isReleaseActive, timeElapsed, events } = engine.state;
   if (!isReleaseActive) return null;
 
-  const secondsRemaining = Math.max(0, 570 - Math.floor(timeElapsed));
+  const secondsRemaining = Math.max(0, 600 - Math.floor(timeElapsed));
 
   // Recent 3 autonomous events
   const recentEvents = events.slice(0, 3);
@@ -29,7 +29,7 @@ export const ReleaseOverlay: React.FC<ReleaseOverlayProps> = ({ engine }) => {
       <div className="max-w-xl mx-auto w-full bg-[#121212]/90 border border-amber-400/40 border-l-4 rounded-sm p-4 text-center shadow-2xl backdrop-blur-md">
         <div className="flex items-center justify-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-widest font-mono">
           <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
-          <span>09:00 성령께 온전히 맡겨드림 — 손을 놓음</span>
+          <span>09:00 성령께 온전히 맡겨드림</span>
           <span className="text-white/40 font-mono">({secondsRemaining}초 남음)</span>
         </div>
         <p className="text-xs text-[#F5F5F5] mt-1.5 font-serif font-medium">

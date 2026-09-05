@@ -15,7 +15,8 @@ export type PersonMovementState =
   | 'VISITING'
   | 'SENT'
   | 'RESTING'
-  | 'CRISIS';
+  | 'CRISIS'
+  | 'LEAVING';
 
 export type NeedType =
   | 'QUESTION'
@@ -86,10 +87,26 @@ export interface Person {
 
   need: PersonNeed | null;
   
-  // External person tracking
+  // External person tracking & Evangelism Milestone System
   isExternal: boolean;
   externalState?: ExternalPersonState;
   contactWithId?: string | null;
+  contactProgress?: number; // 0-100 for evangelism relational progress
+  contactDuration?: number; // Cumulative close-proximity seconds
+  requiredContactDuration?: number; // Target seconds to complete milestone (5-10s)
+  contactMilestoneStage?: 1 | 2 | 3; // 1: 호감/대화(0-33%), 2: 마음 열림(34-66%), 3: 신뢰/복음(67-99%)
+  engagedSeekerIds?: string[]; // On believers: maximum 2 concurrent seekers being marked
+  attraction?: number; // 0-100 (seeker relational attraction)
+  
+  // Relational unique tracking
+  caredPersonIds?: string[];
+  reachedPersonIds?: string[];
+  
+  // Pastoral Rescue & Holding System (Holding onto leaving/lukewarm members)
+  beingHeldById?: string | null; // ID of the shepherd holding and comforting this person
+  isHoldingPersonId?: string | null; // ID of the member this shepherd is holding
+  holdingTimer?: number; // Visual holding animation/embrace timer
+  leavingTimer?: number; // Grace period countdown before leaving (gives shepherd time to reach)
   
   // Sending state
   isBeingSent?: boolean;
@@ -146,6 +163,18 @@ export interface CommunityStats {
   overloadBurnout?: number;
 }
 
+export interface SocietalNews {
+  id: string;
+  category: 'CULT' | 'ECONOMY' | 'POLITICS' | 'SECULARISM';
+  headline: string;
+  impactDescription: string;
+  driftType: DriftType;
+  targetDriftType?: DriftType;
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH';
+  timestamp: number;
+  duration: number; // Duration in seconds to remain active on ticker
+}
+
 export interface CommunityDrift {
   type: DriftType;
   intensity: number;   // 0-100 (Doesn't auto-expire, multi-action mitigation)
@@ -173,6 +202,8 @@ export interface Community {
   hullPoints: { x: number; y: number }[];
   targetRadius: number;
   currentRadius: number;
+  isIndependent?: boolean;
+  isAutonomous?: boolean; // Fully self-governing planted daughter church
 }
 
 export type ActionId = 'FELLOWSHIP' | 'WORD' | 'PRAYER' | 'WORSHIP' | 'CARE' | 'SEND';
@@ -299,24 +330,4 @@ export interface StoryEvent {
   timestamp: number;
   text: string;
   type: 'BLESSING' | 'SEND' | 'DRIFT' | 'WARNING' | 'FRUIT' | 'RELEASE';
-}
-
-// Legacy PracticeCard type kept for backwards compatibility if needed
-export type CardType =
-  | 'MEAL'
-  | 'WORD'
-  | 'PRAYER'
-  | 'ENCOURAGE'
-  | 'RECONCILE'
-  | 'TRAIN';
-
-export interface PracticeCard {
-  id: string;
-  type: CardType;
-  name: string;
-  koreanName: string;
-  cost: number;
-  description: string;
-  targetType: 'PERSON' | 'ANY' | 'TENSION' | 'READY';
-  icon: string;
 }

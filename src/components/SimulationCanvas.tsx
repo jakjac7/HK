@@ -7,7 +7,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { GameEngine, Particle } from '../simulation/engine';
 import { drawOrganicBlob } from '../simulation/communityBlob';
 import { CALLING_DEFINITIONS } from '../data/callings';
-import { Person, NeedType, Community } from '../types';
+import { Person, NeedType, PersonNeed, Community } from '../types';
 import { Cross, Plus, Minus, Focus } from 'lucide-react';
 
 interface SimulationCanvasProps {
@@ -245,24 +245,51 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       );
 
       // Draw Organic Community Blobs
+      const isSunday = engine.state.timeElapsed > 10 && (engine.state.timeElapsed % 180) < 15;
+
       for (const comm of engine.state.communities) {
         drawOrganicBlob(ctx, comm, comm.hullPoints);
+
+        if (isSunday) {
+          ctx.save();
+          const pulse = (Math.sin(engine.state.timeElapsed * 4) + 1) / 2;
+          ctx.beginPath();
+          ctx.arc(comm.centerX, comm.centerY, comm.currentRadius * 0.8, 0, Math.PI * 2);
+          const gradient = ctx.createRadialGradient(comm.centerX, comm.centerY, 0, comm.centerX, comm.centerY, comm.currentRadius * 0.8);
+          gradient.addColorStop(0, `rgba(255, 220, 120, ${0.3 + pulse * 0.2})`);
+          gradient.addColorStop(1, 'rgba(255, 220, 120, 0)');
+          ctx.fillStyle = gradient;
+          ctx.fill();
+          ctx.restore();
+        }
 
         // Community Title / Banner in serif
         ctx.save();
         ctx.font = '600 13px "Cinzel", "Playfair Display", Georgia, serif';
         ctx.fillStyle = '#F5F5F5';
         ctx.textAlign = 'center';
-        ctx.fillText(comm.name, comm.centerX, comm.centerY - comm.currentRadius - 16);
 
-        // Safe Capacity indicator badge in mono
+        const isDaughter = comm.isAutonomous || comm.isIndependent;
+        const commPrefix = isDaughter ? '🌿 ' : '🏛️ ';
+        ctx.fillText(`${commPrefix}${comm.name}`, comm.centerX, comm.centerY - comm.currentRadius - 18);
+
+        // Subtitle badge
         ctx.font = '500 10px "JetBrains Mono", monospace';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fillText(
-          `성도 ${comm.stats.population}명 · 은혜의 품 ${comm.stats.safeCapacity}명`,
-          comm.centerX,
-          comm.centerY - comm.currentRadius - 3
-        );
+        if (isDaughter) {
+          ctx.fillStyle = 'rgba(52, 211, 153, 0.9)'; // emerald
+          ctx.fillText(
+            `[자립 분립교회 · 자율 운영: ${comm.priority}] 성도 ${comm.stats.population}명`,
+            comm.centerX,
+            comm.centerY - comm.currentRadius - 5
+          );
+        } else {
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.85)'; // amber
+          ctx.fillText(
+            `[뿌리 모교회] 성도 ${comm.stats.population}명 · 품 ${comm.stats.safeCapacity}명`,
+            comm.centerX,
+            comm.centerY - comm.currentRadius - 5
+          );
+        }
         ctx.restore();
       }
 
@@ -601,7 +628,45 @@ function drawBackgroundAmbience(
 function drawRelationshipTrails(ctx: CanvasRenderingContext2D, people: Person[]) {
   ctx.save();
   for (const p of people) {
-    // 1. Evangelist Outreach trail
+    // 1. Pastoral Hold / Shepherd rescue thread (Req 2)
+    if (p.beingHeldById) {
+      const shepherd = people.find(g => g.id === p.beingHeldById);
+      if (shepherd) {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(shepherd.x, shepherd.y);
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.85)'; // Emerald-gold rescue lifeline
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Cross icon at midpoint
+        const midX = (p.x + shepherd.x) / 2;
+        const midY = (p.y + shepherd.y) / 2;
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('✚', midX, midY);
+      }
+    }
+
+    // 2. Evangelist Outreach trail & Active Seeker engagement (Req 1)
+    if (p.engagedSeekerIds && p.engagedSeekerIds.length > 0) {
+      for (const seekerId of p.engagedSeekerIds) {
+        const seeker = people.find(s => s.id === seekerId);
+        if (seeker && seeker.isExternal) {
+          ctx.beginPath();
+          ctx.setLineDash([4, 4]);
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(seeker.x, seeker.y);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)'; // Cyan evangelism tether
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
     if (p.isExternal && p.externalState === 'FOLLOWING' && p.contactWithId) {
       const guide = people.find(g => g.id === p.contactWithId);
       if (guide) {
@@ -616,8 +681,8 @@ function drawRelationshipTrails(ctx: CanvasRenderingContext2D, people: Person[])
       }
     }
     
-    // 2. Shepherd / Leader Orbit trail
-    if (!p.isExternal && !p.calling) {
+    // 3. Shepherd / Leader Orbit trail
+    if (!p.isExternal && !p.calling && p.movementState !== 'LEAVING') {
       let leader = null;
       if (p.caregiverId) {
         leader = people.find(g => g.id === p.caregiverId);
@@ -689,6 +754,13 @@ function drawPersonNode(
     baseLight = 35;
   }
 
+  // If person has a need, gray them out and darken them based on how chronic it is
+  if (p.need) {
+    const needProg = 1 - (p.need.duration / p.need.maxDuration);
+    baseSat = baseSat * (1 - needProg * 0.8); // Lose saturation
+    baseLight = baseLight * (1 - needProg * 0.4); // Darken
+  }
+
   // Node Color
   const fillColor = `hsl(${baseHue}, ${baseSat}%, ${baseLight}%)`;
   const strokeColor = isSelected
@@ -729,8 +801,53 @@ function drawPersonNode(
     }
   }
 
-  // Visual cue for UNCARED persons: Urgent dashed warning ring
-  if (!p.isExternal && p.careStatus === 'UNCARED') {
+  // Visual cue for LEAVING / COOLING persons (Req 2)
+  if (!p.isExternal && p.movementState === 'LEAVING') {
+    ctx.save();
+    if (p.beingHeldById) {
+      // Shepherd is holding onto them: Warm Emerald/Gold embrace aura
+      const pulse = 1 + Math.sin(time * 0.01) * 0.1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (radius + 8) * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.95)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Holding badge above head
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.95)';
+      ctx.font = 'bold 9px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('💚 목자의 돌봄 (회복 중)', p.x, p.y - radius - 14);
+    } else {
+      // Unheld cold member drifting out: Urgent Frost/Red warning ring
+      const pulse = 1 + Math.sin(time * 0.015) * 0.18;
+      ctx.beginPath();
+      ctx.setLineDash([4, 3]);
+      ctx.arc(p.x, p.y, (radius + 9) * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.95)';
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Urgent Leaving Countdown badge
+      const timerSec = Math.max(0, Math.ceil(p.leavingTimer || 25));
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 9px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`❄️ 이탈 위기 (${timerSec}s)`, p.x, p.y - radius - 14);
+
+      // Mini timer bar
+      const barW = 28;
+      const barH = 3;
+      const pct = (p.leavingTimer || 25) / 25;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillRect(p.x - barW / 2, p.y - radius - 8, barW, barH);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(p.x - barW / 2, p.y - radius - 8, barW * Math.max(0, Math.min(1, pct)), barH);
+    }
+    ctx.restore();
+  } else if (!p.isExternal && p.careStatus === 'UNCARED') {
+    // Urgent dashed warning ring for uncared members
     const pulse = 1 + Math.sin(time * 0.008) * 0.15;
     ctx.save();
     ctx.beginPath();
@@ -742,13 +859,58 @@ function drawPersonNode(
     ctx.restore();
   }
 
+  // Visual cue for External Seeker Evangelism Milestone Progress (Req 1)
+  if (p.isExternal && p.contactProgress && p.contactProgress > 0 && p.externalState !== 'FOLLOWING') {
+    const prog = p.contactProgress / 100;
+    const stage = p.contactMilestoneStage || (prog > 0.66 ? 3 : prog > 0.33 ? 2 : 1);
+    ctx.save();
+
+    // Background track ring
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Progress arc
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+    ctx.strokeStyle = stage === 3 ? '#38bdf8' : stage === 2 ? '#67e8f9' : '#93c5fd';
+    ctx.lineWidth = 3.0;
+    ctx.stroke();
+
+    // Milestone notches at 33% and 66%
+    for (const tickProg of [0.33, 0.66]) {
+      const angle = -Math.PI / 2 + Math.PI * 2 * tickProg;
+      const tx1 = p.x + Math.cos(angle) * (radius + 2);
+      const ty1 = p.y + Math.sin(angle) * (radius + 2);
+      const tx2 = p.x + Math.cos(angle) * (radius + 6);
+      const ty2 = p.y + Math.sin(angle) * (radius + 6);
+      ctx.beginPath();
+      ctx.moveTo(tx1, ty1);
+      ctx.lineTo(tx2, ty2);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    
+    // Stage text indicator
+    const stageLabel = stage === 1 ? '1단계 교제' : stage === 2 ? '2단계 마음열림' : '3단계 결신직전';
+    ctx.fillStyle = stage === 3 ? '#38bdf8' : '#7dd3fc';
+    ctx.font = 'bold 9px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${stageLabel} (${Math.round(p.contactProgress)}%)`, p.x, p.y - radius - 10);
+    ctx.restore();
+  }
+
   // Visual cue for SHEPHERD: Pastoral care aura
   if (p.calling === 'SHEPHERD' && !p.isExternal) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(p.x, p.y, radius + 5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)'; // Emerald care aura
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = p.isHoldingPersonId ? 'rgba(52, 211, 153, 0.95)' : 'rgba(52, 211, 153, 0.5)'; // Emerald care aura
+    ctx.lineWidth = p.isHoldingPersonId ? 2.2 : 1.2;
     ctx.stroke();
     ctx.restore();
   }
@@ -756,8 +918,8 @@ function drawPersonNode(
   // Visual Feedback for Skills (Action Effects)
   if (p.visualEffect && p.visualEffect.timer > 0) {
     const vTimer = p.visualEffect.timer;
-    // 3.0s total. Expand out quickly, fade out slowly
-    const progress = 1 - (vTimer / 3.0);
+    const maxTimer = p.visualEffect.type === 'CARE' ? 6.0 : 3.0;
+    const progress = 1 - (vTimer / maxTimer);
     const effectRadius = radius + 4 + progress * 25;
     const alpha = Math.max(0, (1 - progress) * 0.8);
     
@@ -779,6 +941,18 @@ function drawPersonNode(
     ctx.arc(p.x, p.y, radius + 2 + progress * 10, 0, Math.PI * 2);
     ctx.fillStyle = effectColor + (alpha * 0.4) + ')';
     ctx.fill();
+
+    // Draw Cross icon for CARE
+    if (p.visualEffect.type === 'CARE') {
+      const iconY = p.y - radius - 15 - (progress * 15);
+      const iconAlpha = Math.max(0, Math.sin(progress * Math.PI)); // Fade in and out
+      ctx.fillStyle = `rgba(255, 255, 255, ${iconAlpha})`;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✚', p.x, iconY);
+    }
+    
     ctx.restore();
   }
 
@@ -839,7 +1013,7 @@ function drawPersonNode(
 
   // Draw Need Signal Overlay
   if (p.need) {
-    drawNeedSignal(ctx, p.x, p.y - radius - 10, p.need.type, time);
+    drawNeedSignal(ctx, p.x, p.y - radius - 10, p.need, time);
   }
 
   // Draw Name Text beneath node (Clean display typography)
@@ -860,73 +1034,83 @@ function drawNeedSignal(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  type: NeedType,
+  need: PersonNeed,
   time: number
 ) {
   ctx.save();
+  const type = need.type;
+  const progress = 1 - (need.duration / need.maxDuration);
+  
+  // Shake effect when chronic (> 70%)
+  const isChronic = progress > 0.7;
+  const shakeX = isChronic ? (Math.random() * 2 - 1) * 2 : 0;
+  const shakeY = isChronic ? (Math.random() * 2 - 1) * 2 : 0;
   const bob = Math.sin(time * 0.005) * 2;
+
+  const nx = x + shakeX;
+  const ny = y + bob + shakeY;
 
   switch (type) {
     case 'QUESTION':
-      ctx.fillStyle = '#6366f1';
+      ctx.fillStyle = isChronic ? '#818cf8' : '#6366f1';
       ctx.beginPath();
-      ctx.arc(x, y + bob, 8, 0, Math.PI * 2);
+      ctx.arc(nx, ny, 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('?', x, y + bob);
+      ctx.fillText('?', nx, ny);
       break;
 
     case 'NEWCOMER':
-      ctx.strokeStyle = '#fbbf24';
+      ctx.strokeStyle = isChronic ? '#fcd34d' : '#fbbf24';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(x, y + bob, 8 + Math.sin(time * 0.008) * 2, 0, Math.PI * 2);
+      ctx.arc(nx, ny, 8 + Math.sin(time * 0.008) * 2, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = '#f59e0b';
+      ctx.fillStyle = isChronic ? '#fbbf24' : '#f59e0b';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('★', x, y + bob);
+      ctx.fillText('★', nx, ny);
       break;
 
     case 'WEARY':
-      ctx.fillStyle = '#f97316';
+      ctx.fillStyle = isChronic ? '#fb923c' : '#f97316';
       ctx.beginPath();
-      ctx.arc(x, y + bob, 6, 0, Math.PI * 2);
+      ctx.arc(nx, ny, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 8px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('z', x, y + bob);
+      ctx.fillText('z', nx, ny);
       break;
 
     case 'TENSION':
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = isChronic ? '#f87171' : '#ef4444';
       ctx.beginPath();
-      ctx.arc(x, y + bob, 7, 0, Math.PI * 2);
+      ctx.arc(nx, ny, 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('!', x, y + bob);
+      ctx.fillText('!', nx, ny);
       break;
 
     case 'READY':
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.arc(x, y + bob, 8, 0, Math.PI * 2);
+      ctx.arc(nx, ny, 8, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fillStyle = '#34d399';
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('▲', x, y + bob);
+      ctx.fillText('▲', nx, ny);
       break;
   }
   ctx.restore();

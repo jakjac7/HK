@@ -6,7 +6,6 @@
 import {
   Person,
   Community,
-  PracticeCard,
   RunStats,
   CommunityPriority,
   CallingType,
@@ -19,9 +18,9 @@ import {
   MapId,
   ReleaseSnapshot,
   MapZone,
+  SocietalNews,
 } from '../types';
 import { NameGenerator } from '../data/names';
-import { createStarterDeck } from '../data/cards';
 import { calculatePersonSteering, distance, clamp } from './steering';
 import { calculateCommunityHull } from './communityBlob';
 import { soundEngine } from './sound';
@@ -44,6 +43,7 @@ export interface Particle {
   progress: number;
   type: 'BLESSING' | 'GENERIC';
   targetPersonId?: string;
+  speedModifier?: number;
 }
 
 export interface GameEngineState {
@@ -62,13 +62,6 @@ export interface GameEngineState {
   actions: PlayerAction[];
   selectedActionId: ActionId | null;
 
-  // Legacy cards kept for backward compatibility if needed
-  deck: PracticeCard[];
-  hand: PracticeCard[];
-  discard: PracticeCard[];
-  cardDrawTimer: number;
-  selectedCardId: string | null;
-
   communities: Community[];
   people: Person[];
 
@@ -78,6 +71,7 @@ export interface GameEngineState {
   stats: RunStats;
 
   releaseSnapshot?: ReleaseSnapshot;
+  societalNews: SocietalNews | null;
   callingFeedback?: {
     personId: string;
     personName: string;
@@ -93,8 +87,11 @@ export class GameEngine {
   private worldWidth: number = 800;
   private worldHeight: number = 600;
   private needSpawnTimer: number = 0;
+  private needSpawnInterval: number = 135; // 2 ~ 2.5 minutes cycle
   private externalReplenishTimer: number = 0;
   private hasInitialLayout: boolean = false;
+  private lastWordPulseTime: number = 0;
+  private autonomousActionTimers: Map<string, number> = new Map();
 
   // Sub-systems
   public mapSystem: MapSystem;
@@ -318,10 +315,6 @@ export class GameEngine {
       });
     }
 
-    const starterDeck = createStarterDeck();
-    const hand = starterDeck.slice(0, 3);
-    const deck = starterDeck.slice(3);
-
     const initialEvent: StoryEvent = {
       id: 'event_init',
       timestamp: 0,
@@ -345,11 +338,6 @@ export class GameEngine {
       mapId: randomMapId,
       actions: this.actionSystem.actions,
       selectedActionId: null,
-      deck,
-      hand,
-      discard: [],
-      cardDrawTimer: 0,
-      selectedCardId: null,
       communities: [initialCommunity],
       people,
       selectedPersonId: null,
@@ -384,6 +372,7 @@ export class GameEngine {
         struggles: [],
         reflections: [],
       },
+      societalNews: null,
       callingFeedback: null,
     };
   }
@@ -408,8 +397,8 @@ export class GameEngine {
       this.triggerTheRelease();
     }
 
-    // At 09:30 (570s), complete run and evaluate victory score
-    if (this.state.timeElapsed >= 570 && !this.state.isGameOver) {
+    // At 10:00 (600s), complete run and evaluate victory score
+    if (this.state.timeElapsed >= 600 && !this.state.isGameOver) {
       this.finishRun();
       return;
     }
@@ -422,7 +411,8 @@ export class GameEngine {
     // Update Particles
     if (this.state.particles) {
       this.state.particles.forEach(p => {
-        p.progress += dt * 1.5; // Particle speed
+        const speed = p.speedModifier !== undefined ? p.speedModifier : 1.0;
+        p.progress += dt * 1.5 * speed; // Particle speed
       });
       this.state.particles = this.state.particles.filter(p => p.progress < 1.0);
     }
@@ -430,6 +420,50 @@ export class GameEngine {
     // Clear calling feedback after 4 seconds
     if (this.state.callingFeedback && performance.now() - this.state.callingFeedback.timestamp > 4000) {
       this.state.callingFeedback = null;
+    }
+
+    // Update societal news alert countdown
+    if (this.state.societalNews) {
+      this.state.societalNews.duration -= dt;
+      if (this.state.societalNews.duration <= 0) {
+        this.state.societalNews = null;
+      }
+    }
+
+    // Gradual decay of Word depth & community formation over time (Req 3)
+    for (const p of this.state.people) {
+      if (!p.isExternal && p.depth > 15) {
+        p.depth = Math.max(15, p.depth - dt * 0.12);
+      }
+    }
+    for (const comm of this.state.communities) {
+      if (comm.stats.formation > 20) {
+        comm.stats.formation = Math.max(20, comm.stats.formation - dt * 0.10);
+      }
+    }
+
+    // 3-Minute (180s) Word Proclamation Pulse (+10% of current value, Req 3)
+    const current3MinCycle = Math.floor(this.state.timeElapsed / 180);
+    if (current3MinCycle > this.lastWordPulseTime && this.state.timeElapsed >= 180) {
+      this.lastWordPulseTime = current3MinCycle;
+      
+      for (const comm of this.state.communities) {
+        comm.stats.formation = Math.min(100, Math.round(comm.stats.formation * 1.10));
+        comm.stats.integrity = Math.min(100, Math.round(comm.stats.integrity * 1.05));
+      }
+      for (const p of this.state.people) {
+        if (!p.isExternal) {
+          p.depth = Math.min(100, Math.round(p.depth * 1.10));
+          p.trust = Math.min(100, Math.round(p.trust * 1.05));
+          p.visualEffect = { type: 'WORD', timer: 3.5 };
+        }
+      }
+
+      this.logEvent(
+        `[강단 말씀의 은혜] 3분 정기 주일 말씀 선포! 모든 성도와 공동체의 복음 깊이가 10% 상승했습니다. (점진적으로 하락하므로 주기적인 말씀 선포로 활력을 유지하십시오)`,
+        'BLESSING'
+      );
+      soundEngine.playChime();
     }
 
     // 2. Priority Cooldown
@@ -441,7 +475,6 @@ export class GameEngine {
 
     // 3. Update People Movement & Steering
     const world = { width: this.worldWidth, height: this.worldHeight };
-    // Req 3: Every 3, 6, 9 minutes (180s, 360s, 540s) trigger Sunday Scrum Worship for 15 seconds
     const isSunday = this.state.timeElapsed > 10 && (this.state.timeElapsed % 180) < 15;
     
     for (const person of this.state.people) {
@@ -467,11 +500,67 @@ export class GameEngine {
       person.x += person.vx * dt;
       person.y += person.vy * dt;
 
-      // Update Need countdown
+      // Update Need countdown and gradual decay
       if (person.need) {
         person.need.duration -= dt;
+        const needProg = 1 - (person.need.duration / person.need.maxDuration);
+        
+        // Gradual ailments while need is active (e.g. losing stability/trust steadily)
+        if (person.need.type === 'WEARY') {
+          person.burnout = Math.min(100, person.burnout + dt * 1.2);
+          person.stability = Math.max(0, person.stability - dt * 0.4);
+        } else if (person.need.type === 'TENSION') {
+          person.stability = Math.max(0, person.stability - dt * 0.8);
+          person.trust = Math.max(0, person.trust - dt * 0.8);
+        } else if (person.need.type === 'NEWCOMER' || person.need.type === 'QUESTION') {
+          person.stability = Math.max(0, person.stability - dt * 0.4);
+        }
+
+        // Chronic progression: if left untreated (>60% time elapsed), alienation sets in and person drifts toward edge
+        if (needProg > 0.6) {
+          person.leaveIntent = Math.min(100, (person.leaveIntent || 0) + dt * 2.5);
+          if (person.movementState === 'INSIDE') {
+            person.movementState = 'EDGE';
+          }
+        }
+        
         if (person.need.duration <= 0) {
           this.handleNeedExpiry(person);
+        }
+      }
+
+      // Update LEAVING state countdown & pastoral rescue handling (Req 2)
+      if (person.movementState === 'LEAVING') {
+        if (person.beingHeldById) {
+          // Shepherd is holding them! Reassure and pause leaving timer
+          if (person.leavingTimer !== undefined) {
+            person.leavingTimer = Math.min(25, person.leavingTimer + dt * 2);
+          }
+          if ((person.leaveIntent || 0) < 20) {
+            person.movementState = 'INSIDE';
+            person.leavingTimer = undefined;
+            person.beingHeldById = null;
+          }
+        } else {
+          // Member is drifting outward away from church
+          if (person.leavingTimer === undefined) person.leavingTimer = 25;
+          person.leavingTimer -= dt;
+
+          const comm = this.state.communities.find(c => c.id === person.communityId);
+          if (comm) {
+            const dToComm = distance(person.x, person.y, comm.centerX, comm.centerY);
+            // Only if timer expires AND they have walked far beyond community radius (>1.35x)
+            if (person.leavingTimer <= 0 && dToComm > comm.currentRadius * 1.35) {
+              const nearbyShepherd = this.state.people.some(
+                p => p.calling === 'SHEPHERD' && distance(p.x, p.y, person.x, person.y) < 60
+              );
+              if (!nearbyShepherd) {
+                this.dropOutPerson(person);
+              } else {
+                person.leavingTimer = 8; // Extra grace if shepherd is on the way
+              }
+            }
+          }
         }
       }
 
@@ -518,7 +607,7 @@ export class GameEngine {
       }
 
       // 4. Calling Discovery Check: When readiness & depth >= 70, triggers calling reveal!
-      if ((!person.calling || person.calling === 'WORSHIPPER' || person.calling === 'INTERCESSOR') && person.communityId && person.depth >= 68 && person.readiness >= 68) {
+      if (!person.calling && person.communityId && person.depth >= 68 && person.readiness >= 68) {
         const comm = this.state.communities.find(c => c.id === person.communityId);
         if (comm) {
           this.triggerCallingDiscovery(person, comm);
@@ -543,7 +632,19 @@ export class GameEngine {
       }
 
       // Run Drift System (vulnerability accumulation, drift generation, escalation)
-      const driftResult = DriftSystem.updateDrifts(comm, this.state.people, mapProfile, this.vulnerabilities, dt);
+      const driftResult = DriftSystem.updateDrifts(
+        comm,
+        this.state.people,
+        mapProfile,
+        this.vulnerabilities,
+        dt,
+        this.state.timeElapsed
+      );
+      if (driftResult.societalAlert) {
+        this.state.societalNews = driftResult.societalAlert;
+        this.logEvent(`[시대의 징후] ${driftResult.societalAlert.headline}`, 'WARNING');
+        soundEngine.playAlert();
+      }
       if (driftResult.spawnedDrift && comm.drift) {
         this.logEvent(`공동체에 '${comm.drift.title}' 위기가 고조되고 있습니다. (${comm.drift.vulnerabilitySource})`, 'DRIFT');
       }
@@ -577,10 +678,11 @@ export class GameEngine {
       comm.hullPoints = calculateCommunityHull(comm, members, performance.now());
     }
 
-    // 6. Timed Directors (Needs & Map-based Population Replenishment)
+    // 6. Timed Directors (Needs & Map-based Population Replenishment: 2-3 min cycle)
     this.needSpawnTimer += dt;
-    if (this.needSpawnTimer >= 14) {
+    if (this.needSpawnTimer >= this.needSpawnInterval) {
       this.needSpawnTimer = 0;
+      this.needSpawnInterval = 120 + Math.random() * 40; // 2 ~ 2.6 minutes cycle
       this.spawnPeriodicNeed();
     }
 
@@ -589,6 +691,125 @@ export class GameEngine {
     if (this.externalReplenishTimer >= replenishThreshold) {
       this.externalReplenishTimer = 0;
       this.replenishExternalPeople();
+    }
+
+    // 7. Update Autonomous Planted Communities (Req 4: Self-governing & Autonomous Evangelism)
+    this.updateAutonomousPlanting(dt);
+  }
+
+  /**
+   * Autonomous operation of planted daughter churches (Req 4)
+   * The daughter church has no player micromanagement, it evangelizes,
+   * balances care, raises leaders, and overcomes crises autonomously.
+   */
+  private updateAutonomousPlanting(dt: number) {
+    const autonomousComms = this.state.communities.filter(c => c.isAutonomous || c.isIndependent);
+    if (autonomousComms.length === 0) return;
+
+    for (const comm of autonomousComms) {
+      const commTimer = (this.autonomousActionTimers.get(comm.id) || 0) + dt;
+      this.autonomousActionTimers.set(comm.id, commTimer);
+
+      const members = this.state.people.filter(p => p.communityId === comm.id && !p.isExternal);
+      if (members.length === 0) continue;
+
+      // 1. Autonomous Priority Balancing (every 14 seconds)
+      if (commTimer > 14) {
+        this.autonomousActionTimers.set(comm.id, 0);
+
+        const wearyCount = members.filter(p => p.burnout > 50 || p.need?.type === 'WEARY').length;
+        const leavingCount = members.filter(p => p.movementState === 'LEAVING').length;
+        const questionCount = members.filter(p => p.need?.type === 'QUESTION').length;
+
+        if (wearyCount > 0 || leavingCount > 0 || questionCount > 0) {
+          comm.priority = 'CARE';
+        } else if (members.length < 8) {
+          comm.priority = 'GO';
+        } else {
+          comm.priority = 'ROOT';
+        }
+
+        // 2. Autonomous Discipleship / Leader Training
+        const matureLeader = members.find(p => p.isMatureDisciple || p.calling !== null);
+        const discipleCandidate = members.find(p => p.calling === null && (p.readiness > 45 || p.depth > 45));
+        if (matureLeader && discipleCandidate && Math.random() < 0.4) {
+          this.triggerCallingDiscovery(discipleCandidate, comm);
+          this.logEvent(
+            `[분립교회 자율 양육] ${comm.name}의 ${discipleCandidate.name} 성도가 자체적인 양육을 통해 사역자로 세워졌습니다!`,
+            'FRUIT'
+          );
+          this.state.stats.autonomousFormationCount++;
+        }
+      }
+
+      // 3. Autonomous Crisis / Drift Mitigation
+      if (comm.drift) {
+        let mitigationPower = 0.9;
+        const leaders = members.filter(p => p.calling !== null);
+        for (const leader of leaders) {
+          if (comm.drift.type === 'DECEPTION' && leader.calling === 'TEACHER') mitigationPower += 0.8;
+          if (comm.drift.type === 'BURNOUT' && leader.calling === 'INTERCESSOR') mitigationPower += 0.8;
+          if (comm.drift.type === 'DIVISION' && leader.calling === 'SHEPHERD') mitigationPower += 0.8;
+          if (comm.drift.type === 'APATHY' && leader.calling === 'EVANGELIST') mitigationPower += 0.8;
+        }
+
+        comm.drift.intensity = Math.max(0, comm.drift.intensity - dt * mitigationPower);
+        if (comm.drift.intensity <= 0) {
+          this.logEvent(
+            `[분립교회 자생력] ${comm.name}이(가) 지도자들의 헌신으로 '${comm.drift.title}' 위기를 스스로 극복했습니다!`,
+            'BLESSING'
+          );
+          comm.drift = null;
+          this.state.stats.crisesOvercome++;
+          this.state.stats.autonomousCrisesResolved++;
+        }
+      }
+
+      // 4. Autonomous Evangelism: Evangelist reaching out to seekers
+      const evangelist = members.find(p => p.calling === 'EVANGELIST') || members[0];
+      if (evangelist && comm.stats.population < 16) {
+        const seeker = this.state.people.find(
+          p => p.isExternal && distance(p.x, p.y, comm.centerX, comm.centerY) < comm.currentRadius * 1.65
+        );
+        if (seeker && (!seeker.contactWithId || seeker.contactWithId === evangelist.id)) {
+          seeker.contactWithId = evangelist.id;
+          seeker.attraction = Math.min(100, (seeker.attraction || 0) + dt * 16);
+
+          if (seeker.attraction >= 100) {
+            this.admitNewcomerToCommunity(seeker, comm);
+            this.logEvent(
+              `[분립교회 자율 전도] ${comm.name}의 자체 전도로 새가족(${seeker.name})이 등록했습니다!`,
+              'FRUIT'
+            );
+            this.state.stats.peopleReached++;
+            this.state.stats.autonomousReachCount++;
+            soundEngine.playNewcomerChime();
+          }
+        }
+      }
+
+      // 5. Autonomous Pastoral Care: Shepherds holding leaving members
+      const shepherd = members.find(p => p.calling === 'SHEPHERD');
+      if (shepherd) {
+        const leavingMember = members.find(p => p.movementState === 'LEAVING');
+        if (leavingMember) {
+          const d = distance(shepherd.x, shepherd.y, leavingMember.x, leavingMember.y);
+          if (d < 45) {
+            leavingMember.beingHeldById = shepherd.id;
+            leavingMember.leaveIntent = Math.max(0, (leavingMember.leaveIntent || 0) - dt * 14);
+            leavingMember.stability = Math.min(100, leavingMember.stability + dt * 10);
+            if (leavingMember.leaveIntent <= 10) {
+              leavingMember.movementState = 'INSIDE';
+              leavingMember.beingHeldById = null;
+              this.logEvent(
+                `[분립교회 목양] ${comm.name}의 ${shepherd.name} 목자가 흔들리던 ${leavingMember.name} 성도를 사랑으로 붙잡았습니다.`,
+                'BLESSING'
+              );
+              this.state.stats.autonomousCareCount++;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -651,6 +872,13 @@ export class GameEngine {
     if (!primaryComm) return false;
 
     const targetPerson = targetPersonId ? this.state.people.find(p => p.id === targetPersonId) || null : null;
+    if (targetPerson && targetPerson.communityId) {
+      const comm = this.state.communities.find(c => c.id === targetPerson.communityId);
+      if (comm && comm.isIndependent) {
+        this.logEvent('독립된 개척 공동체의 성도에게는 개입할 수 없습니다.', 'WARNING');
+        return false;
+      }
+    }
 
     const result = this.actionSystem.executeAction(
       actionId,
@@ -674,12 +902,12 @@ export class GameEngine {
         const startY = shepherd ? shepherd.y : primaryComm.centerY;
 
         if (targetPerson) {
-          this.spawnParticle(startX, startY, targetPerson.x, targetPerson.y, 'BLESSING', targetPerson.id);
+          this.spawnParticle(startX, startY, targetPerson.x, targetPerson.y, 'BLESSING', targetPerson.id, 0.3);
         } else {
           // Global care
           const uncaredOrWeary = commMembers.filter(p => p.careStatus === 'UNCARED' || p.burnout > 50);
           uncaredOrWeary.forEach(p => {
-            this.spawnParticle(startX, startY, p.x, p.y, 'BLESSING', p.id);
+            this.spawnParticle(startX, startY, p.x, p.y, 'BLESSING', p.id, 0.3);
           });
         }
       }
@@ -691,52 +919,25 @@ export class GameEngine {
     }
   }
 
-  /**
-   * Backward-compatible helper for legacy card play
-   */
-  public playCard(cardId: string, targetPersonId?: string): boolean {
-    // Map card types to the new ActionId
-    const mapping: Record<string, ActionId> = {
-      MEAL: 'FELLOWSHIP',
-      WORD: 'WORD',
-      PRAYER: 'PRAYER',
-      ENCOURAGE: 'CARE',
-      RECONCILE: 'FELLOWSHIP',
-      TRAIN: 'WORD',
-    };
-    const card = this.state.hand.find(c => c.id === cardId);
-    if (!card) return false;
-
-    const actionId = mapping[card.type] || 'FELLOWSHIP';
-    const success = this.executeAction(actionId, targetPersonId);
-    if (success) {
-      const idx = this.state.hand.findIndex(c => c.id === cardId);
-      if (idx !== -1) {
-        const [c] = this.state.hand.splice(idx, 1);
-        this.state.discard.push(c);
-      }
-    }
-    return success;
-  }
-
   public resolveDriftManual(commId: string, type: string) {
     const cost = 1; // Fixed attention cost to manually resolve drift
     if (this.state.attention < cost) {
-      this.logEvent('시선(행동력)이 부족하여 영적 기류 문제를 직접 해결할 수 없습니다.', 'WARNING');
+      this.logEvent('시선(행동력)이 부족하여 위기 문제를 직접 해결할 수 없습니다.', 'WARNING');
       return;
     }
 
     const comm = this.state.communities.find(c => c.id === commId);
     if (!comm || !comm.drift || comm.drift.type !== type) return;
 
-    this.state.attention -= cost;
+    this.actionSystem.attention -= cost;
+    this.state.attention = this.actionSystem.attention;
     comm.drift = null; // Instantly resolve it
     
     soundEngine.playCardUse(); // Play sound effect
-    this.logEvent(`[${comm.name}]의 영적 기류 문제를 행동력을 소모하여 직접 개입해 해결했습니다.`, 'BLESSING');
+    this.logEvent(`[${comm.name}]의 위기 상황을 행동력을 소모하여 직접 개입해 해결했습니다.`, 'BLESSING');
   }
 
-  public spawnParticle(sourceX: number, sourceY: number, targetX: number, targetY: number, type: 'BLESSING' | 'GENERIC', targetPersonId?: string) {
+  public spawnParticle(sourceX: number, sourceY: number, targetX: number, targetY: number, type: 'BLESSING' | 'GENERIC', targetPersonId?: string, speedModifier: number = 1.0) {
     if (!this.state.particles) this.state.particles = [];
     this.state.particles.push({
       id: `particle_${Date.now()}_${Math.random()}`,
@@ -746,7 +947,8 @@ export class GameEngine {
       targetY,
       progress: 0,
       type,
-      targetPersonId
+      targetPersonId,
+      speedModifier
     });
   }
 
@@ -852,6 +1054,12 @@ export class GameEngine {
     const comm = this.state.communities.find(c => c.id === commId);
     if (!comm || comm.priorityCooldown > 0) return false;
 
+    // Planted daughter churches operate autonomously without human player micromanagement (Req 4)
+    if (comm.isAutonomous || comm.isIndependent) {
+      this.logEvent(`[자립 분립교회] '${comm.name}'은(는) 사람의 통제권을 벗어나 성령의 인도하심 아래 스스로 운영됩니다.`, 'WARNING');
+      return false;
+    }
+
     comm.priority = priority;
     comm.priorityCooldown = 20;
 
@@ -940,7 +1148,7 @@ export class GameEngine {
     });
 
     this.logEvent(
-      `${leader.name} 사역자와 ${followers.length}명의 동역자가 새로운 지경을 향해 믿음으로 분립 개척(파송)되었습니다!`,
+      `${leader.name} 사역자와 ${followers.length}명의 동역자가 새로운 지경을 향해 믿음으로 파송되었습니다!`,
       'SEND'
     );
     return true;
@@ -953,6 +1161,19 @@ export class GameEngine {
     const newName = newCommIndex === 2 ? '빌립보 공동체' : '에베소 공동체';
 
     const sourceComm = this.state.communities.find(c => c.id === leader.communityId) || this.state.communities[0];
+    
+    // Ensure minimum distance of at least 180px (~3cm) and outer radius clearance from source community
+    let finalX = leader.x;
+    let finalY = leader.y;
+    const distToSource = Math.sqrt(Math.pow(finalX - sourceComm.centerX, 2) + Math.pow(finalY - sourceComm.centerY, 2));
+    const minPlantingDist = Math.max(180, sourceComm.currentRadius + 95);
+    if (distToSource < minPlantingDist) {
+      const angle = Math.atan2(finalY - sourceComm.centerY, finalX - sourceComm.centerX);
+      finalX = sourceComm.centerX + Math.cos(angle) * minPlantingDist;
+      finalY = sourceComm.centerY + Math.sin(angle) * minPlantingDist;
+      leader.x = finalX;
+      leader.y = finalY;
+    }
 
     // Transmission: New Community State = Source Community 60% + Sent Leader 40% (Section 45)
     const transmittedStats = GenerationSystem.computeTransmission(sourceComm, leader);
@@ -964,9 +1185,11 @@ export class GameEngine {
     const newCommunity: Community = {
       id: newCommId,
       name: newName,
-      centerX: leader.x,
-      centerY: leader.y,
+      centerX: finalX,
+      centerY: finalY,
       colorBase: newCommIndex === 2 ? 'hsl(155, 80%, 50%)' : 'hsl(42, 90%, 55%)',
+      isIndependent: true,
+      isAutonomous: true,
       stats: {
         population: population,
         area: 16000,
@@ -1019,7 +1242,7 @@ export class GameEngine {
 
     soundEngine.playNewcomerChime();
     this.logEvent(
-      `새로운 생명의 터전인 '${newName}'가 분립 개척되었습니다! 복음의 생명력이 재생산됩니다.`,
+      `새로운 생명의 터전인 '${newName}'가 개척되었습니다! 복음의 생명력이 재생산됩니다.`,
       'FRUIT'
     );
   }
@@ -1030,13 +1253,15 @@ export class GameEngine {
     person.movementState = 'INSIDE';
     person.externalState = undefined;
     person.contactWithId = null;
-    person.generation = 1;
+    person.generation = 0;
+    person.isMatureDisciple = false;
+    person.careCapacity = 0;
     person.careStatus = 'UNCARED'; // Will be picked up by Shepherd
     person.need = {
       type: 'NEWCOMER',
-      duration: 25,
-      maxDuration: 25,
-      description: '새로 연결된 지체입니다. 목자의 돌봄이나 애찬이 필요합니다.',
+      duration: 75,
+      maxDuration: 75,
+      description: '새로 연결된 지체입니다. 목자의 돌봄이나 교제가 필요합니다.',
     };
 
     this.state.stats.peopleReached++;
@@ -1108,7 +1333,7 @@ export class GameEngine {
     if (this.state.stats.communitiesFormed > 1) {
       story.push(`공동체가 단일 거대 조직에 안주하지 않고 ${this.state.stats.communitiesFormed}개의 독립된 몸으로 번식했습니다.`);
     }
-    story.push(`사역의 마지막에 손을 놓았을 때, 그리스도의 몸 된 교회는 성령 안에서 스스로 살아서 움직였습니다.`);
+    story.push(`사역의 마지막에 주님께 온전히 맡겨드렸을 때, 그리스도의 몸 된 교회는 성령 안에서 스스로 살아서 움직였습니다.`);
     this.state.stats.runStory = story;
 
     // Simplified Causal Reflections (Section 50)
@@ -1117,7 +1342,7 @@ export class GameEngine {
 
   // Periodic Need Spawner
   private spawnPeriodicNeed() {
-    const internalPeople = this.state.people.filter(p => !p.isExternal && !p.need);
+    const internalPeople = this.state.people.filter(p => !p.isExternal && !p.need && !p.isMatureDisciple);
     if (internalPeople.length === 0) return;
 
     const candidate = internalPeople[Math.floor(Math.random() * internalPeople.length)];
@@ -1126,23 +1351,23 @@ export class GameEngine {
     if (roll < 0.35) {
       candidate.need = {
         type: 'QUESTION',
-        duration: 20,
-        maxDuration: 20,
+        duration: 75,
+        maxDuration: 75,
         description: '말씀에 대한 깊은 의문이 생겼습니다. 복음의 깊은 나눔이 필요합니다.',
       };
     } else if (roll < 0.65) {
       candidate.need = {
         type: 'WEARY',
-        duration: 22,
-        maxDuration: 22,
+        duration: 75,
+        maxDuration: 75,
         description: '사역과 일상에 지쳐 탈진 상태입니다. 기도의 손길이 절실합니다.',
       };
       candidate.burnout = Math.min(100, candidate.burnout + 20);
     } else {
       candidate.need = {
         type: 'TENSION',
-        duration: 22,
-        maxDuration: 22,
+        duration: 75,
+        maxDuration: 75,
         description: '지체 간의 오해로 마음의 거리감이 생겼습니다. 식탁의 교제(함께하기)가 필요합니다.',
       };
     }
@@ -1156,26 +1381,56 @@ export class GameEngine {
 
     switch (needType) {
       case 'QUESTION':
-        person.depth = Math.max(10, person.depth - 15);
-        this.vulnerabilities.confusion += 15;
-        this.logEvent(`${person.name} 님의 의문이 해소되지 못해 믿음의 확신이 흐려졌습니다.`, 'WARNING');
+        this.vulnerabilities.confusion += 10;
         break;
       case 'NEWCOMER':
-        person.stability = Math.max(10, person.stability - 25);
-        this.vulnerabilities.division += 15;
-        this.logEvent(`${person.name} 새가족이 정착하지 못하고 마음이 멀어지고 있습니다.`, 'WARNING');
+        this.vulnerabilities.division += 10;
         break;
       case 'WEARY':
-        person.burnout = Math.min(100, person.burnout + 30);
-        this.vulnerabilities.burnout += 15;
-        this.logEvent(`${person.name} 님이 돌봄 받지 못해 영적 피로(Burnout)에 빠졌습니다.`, 'WARNING');
+        this.vulnerabilities.burnout += 10;
         break;
       case 'TENSION':
-        person.stability = Math.max(10, person.stability - 20);
-        this.vulnerabilities.division += 20;
-        this.logEvent(`${person.name} 지체 간의 갈등이 미해결되어 공동체 내 균열 위험이 높아졌습니다.`, 'WARNING');
+        this.vulnerabilities.division += 12;
         break;
     }
+
+    // If already being held by a shepherd, the person is protected from leaving!
+    if (person.beingHeldById) {
+      person.leaveIntent = 15;
+      person.stability = 60;
+      this.logEvent(`${person.name} 성도가 영적 위기를 겪었으나, 곁에 선 목자의 손길로 지켜졌습니다.`, 'FRUIT');
+      return;
+    }
+
+    // Person enters visible LEAVING state: provides 25s grace window for shepherds to run over and hold them!
+    person.movementState = 'LEAVING';
+    person.leaveIntent = 80;
+    person.leavingTimer = 25;
+    soundEngine.playCardUse();
+    this.logEvent(`[이탈 위기] ${person.name} 성도가 오랜 아픔과 무관심으로 공동체를 떠나려 합니다! 목자의 긴급 심방이 필요합니다.`, 'WARNING');
+  }
+
+  private dropOutPerson(person: Person) {
+    this.logEvent(`${person.name} 성도가 끝내 돌봄을 받지 못하고 쓸쓸히 공동체를 떠나갔습니다.`, 'WARNING');
+    person.isExternal = true;
+    person.communityId = null;
+    person.calling = null;
+    person.generation = 0;
+    person.isMatureDisciple = false;
+    person.careStatus = 'NONE';
+    person.externalState = 'UNCONNECTED';
+    person.movementState = 'OUTSIDE';
+    person.beingHeldById = null;
+    person.leavingTimer = undefined;
+    person.contactProgress = 0;
+    person.contactDuration = 0;
+    person.engagedSeekerIds = [];
+    
+    // Clear relationships
+    if (person.careTargets) person.careTargets = [];
+    
+    // Play sad sound
+    soundEngine.playCardUse(); 
   }
 
   // Replenish external seekers

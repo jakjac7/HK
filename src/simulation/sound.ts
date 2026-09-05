@@ -20,13 +20,46 @@ class SoundEngine {
     }
   }
 
-  public toggleMute(): boolean {
-    this.isMuted = !this.isMuted;
+  public toggleMute(explicit?: boolean): boolean {
+    if (explicit !== undefined) {
+      this.isMuted = explicit;
+    } else {
+      this.isMuted = !this.isMuted;
+    }
     return this.isMuted;
   }
 
   public getIsMuted(): boolean {
     return this.isMuted;
+  }
+
+  // Graceful chime alias
+  public playChime() {
+    this.playNewcomerChime();
+  }
+
+  // Societal alert audio notification
+  public playAlert() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(329.63, now); // E4
+    osc.frequency.linearRampToValueAtTime(440, now + 0.15); // A4
+
+    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.4);
   }
 
   // Worship: warm celestial chord/harmonic layer

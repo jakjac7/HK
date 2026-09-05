@@ -142,7 +142,7 @@ export class ReleaseSystem {
     if (postIntegrity < 60) {
       reflections.push('복음의 깊이가 충분히 다져지지 않아 혼란과 의심의 위기에 흔들렸습니다.');
     } else if (stats.autonomousCrisesResolved > 0) {
-      reflections.push('손을 놓은 후에도 공동체가 오직 성령 안에서 스스로 위기를 이겨냈습니다.');
+      reflections.push('사역을 성령께 온전히 맡겨드린 후에도 공동체가 오직 성령 안에서 스스로 위기를 이겨냈습니다.');
     } else {
       reflections.push('진리의 말씀과 신실한 기도가 공동체를 끝까지 굳건하게 지켜냈습니다.');
     }

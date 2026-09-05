@@ -40,7 +40,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         id="bottom-control-bar"
         className="relative z-30 w-full bg-[#121212]/95 backdrop-blur-md border-t border-rose-500/40 py-2 px-4 text-center text-rose-300 font-medium text-xs tracking-wide font-serif animate-pulse select-none"
       >
-        🕊️ 성령께 온전히 맡겨드림 — 교회의 자율 생명력을 지켜보는 시간입니다
+        🕊️ 성령께 온전히 맡겨드림 — 교회의 성령충만을 지켜보는 시간입니다
       </footer>
     );
   }
@@ -84,14 +84,14 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
       return;
     }
 
-    // Community-wide actions: PRAYER, WORSHIP can execute immediately!
-    if (actionId === 'PRAYER' || actionId === 'WORSHIP') {
+    // Community-wide actions: WORD, PRAYER, WORSHIP, FELLOWSHIP can execute immediately!
+    if (actionId === 'WORD' || actionId === 'PRAYER' || actionId === 'WORSHIP' || actionId === 'FELLOWSHIP') {
       engine.executeAction(actionId);
       onSelectAction(null);
       return;
     }
 
-    // Targeted actions: FELLOWSHIP, WORD, CARE
+    // Targeted actions: CARE (심방)
     if (selectedPersonId) {
       engine.executeAction(actionId, selectedPersonId);
       onSelectAction(null);
@@ -108,14 +108,14 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
       <div className="w-full flex flex-col gap-2 max-w-7xl mx-auto">
         {/* Row 1: Attention (Left) and Priority (Right) */}
         <div className="w-full flex justify-between items-center px-1">
-          {/* Left Wing: Attention Orbs (목회적 시선) */}
+          {/* Left Wing: Attention Orbs (행동력) */}
           <div className="flex items-center gap-1.5 shrink-0">
             <Tooltip
               position="top"
               content={
                 <div>
                   <p className="font-bold text-amber-300">
-                    목회적 시선: {Math.floor(attention)} / 3개
+                    집중 (행동력): {Math.floor(attention)} / 3개
                   </p>
                   <p className="text-white/70 mt-0.5">
                     사역을 집중할 수 있는 영적 에너지입니다. 8초마다 1개씩 회복됩니다.
@@ -326,7 +326,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
             position="top"
             content={
               <div>
-                <p className="font-bold text-cyan-300">분립 개척 파송</p>
+                <p className="font-bold text-cyan-300">리더 파송</p>
                 <p className="text-white/70 mt-0.5">
                   장성한 일꾼을 세워 새로운 선교지로 파송합니다.
                 </p>

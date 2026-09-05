@@ -201,7 +201,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
             <div className="bg-white/5 p-2.5 rounded-sm border border-white/10 flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-center text-white/70 text-[11px] font-serif mb-1">
-                  <span className="font-bold text-violet-300">자율 생명력</span>
+                  <span className="font-bold text-violet-300">성령충만</span>
                   <span className="font-mono font-bold text-violet-300">{autonomyStep} / 10단계</span>
                 </div>
                 <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -264,7 +264,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
               <span className="font-serif font-bold text-[#F5F5F5] tracking-wide">
                 은사 및 사역 현황
               </span>
-              {(!person.calling || person.calling === 'WORSHIPPER' || person.calling === 'INTERCESSOR') && onDiscoverCalling && (
+              {(!person.calling) && onDiscoverCalling && (
                 <button
                   onClick={() => onDiscoverCalling(person.id)}
                   className="flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 px-2 py-1 rounded-sm transition-colors border border-amber-500/30"
@@ -277,7 +277,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
 
             {!person.calling ? (
               <p className="text-[11px] text-white/50 font-sans">
-                아직 직분이 없습니다. 말씀과 양육(행동카드)을 통해 훈련을 받으면 중보자, 예배자로 세워질 수 있습니다.
+                아직 직분이 없습니다. 말씀과 양육(행동카드)을 통해 훈련을 받으면 5가지 직분 중 하나로 세워질 수 있습니다.
               </p>
             ) : (
               <p className="text-[11px] text-white/50 font-sans">

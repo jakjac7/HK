@@ -209,10 +209,10 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
             <div className="bg-white/5 p-3 rounded-sm border border-white/10 flex flex-col gap-1.5">
               <span className="font-serif font-bold text-rose-300 text-xs flex items-center gap-1.5">
                 <Eye className="w-4 h-4 text-rose-400" />
-                09:00 성령께 온전히 맡겨드림 (손을 놓음)
+                09:00 성령께 온전히 맡겨드림
               </span>
               <p className="text-white/70 text-[11px] font-sans">
-                사역의 마지막 30초 동안 인간의 모든 인위적 개입이 멈춥니다. 사람이 손을 놓아도, 참된 주님의 교회는 성령 안에서 스스로 전도하고 사랑하고 가르치며 살아 숨 쉽니다.
+                사역의 마지막 30초 동안 인간의 모든 인위적 개입이 멈춥니다. 사역자가 주님께 온전히 맡겨드려도, 참된 주님의 교회는 성령 안에서 스스로 전도하고 사랑하고 가르치며 살아 숨 쉽니다.
               </p>
             </div>
           </div>

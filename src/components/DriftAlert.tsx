@@ -18,7 +18,7 @@ export const DriftAlert: React.FC<DriftAlertProps> = ({ communities, onResolveDr
   if (activeDrifts.length === 0) return null;
 
   return (
-    <div id="drift-alerts-container" className="absolute top-20 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
+    <div id="drift-alerts-container" className="absolute top-28 left-3 right-3 z-40 flex flex-col gap-2 pointer-events-none">
       {activeDrifts.map(comm => {
         const drift = comm.drift!;
         const isDeception = drift.type === 'DECEPTION';

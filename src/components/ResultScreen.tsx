@@ -70,7 +70,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
             {/* Autonomy */}
             <div>
               <div className="flex justify-between text-white/70 mb-1 font-mono text-[11px]">
-                <span className="font-serif">자율 사역과 생명력 (성령의 운행)</span>
+                <span className="font-serif">자율 사역과 성령충만 (성령의 운행)</span>
                 <span className="font-bold text-violet-300">{toStep10(stats.autonomyScore)}단계 ({stats.autonomyScore}점)</span>
               </div>
               <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">

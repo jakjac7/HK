@@ -24,7 +24,7 @@ export class CareSystem {
     // Identify Shepherds and Mature Disciples
     const shepherds = communityMembers.filter(p => p.calling === 'SHEPHERD');
     const matureDisciples = communityMembers.filter(
-      p => p.calling !== 'SHEPHERD' && (p.generation >= 1 || (p.depth >= 70 && p.stability >= 65))
+      p => p.calling !== 'SHEPHERD' && p.isMatureDisciple
     );
 
     // Calculate total care capacity
@@ -137,12 +137,23 @@ export class CareSystem {
 
     // Apply continuous dynamics for UNCARED persons and Shepherds
     for (const target of uncaredList) {
-      target.leaveIntent = Math.min(100, (target.leaveIntent || 0) + 4 * dt);
-      target.stability = Math.max(10, target.stability - 2 * dt);
-      target.burnout = Math.min(100, target.burnout + 1.5 * dt);
-      // Outer edge drift
-      if (target.movementState !== 'SENT' && target.movementState !== 'CRISIS') {
+      target.leaveIntent = Math.min(100, (target.leaveIntent || 0) + 2.5 * dt);
+      target.stability = Math.max(10, target.stability - 1.2 * dt);
+      target.burnout = Math.min(100, target.burnout + 0.8 * dt);
+      
+      // If left uncared until leaveIntent is high, enter visible LEAVING state
+      if ((target.leaveIntent || 0) >= 68 && target.movementState !== 'LEAVING' && target.movementState !== 'SENT' && target.movementState !== 'CRISIS') {
+        target.movementState = 'LEAVING';
+        target.leavingTimer = 25; // 25s grace period for shepherd to intervene
+      } else if (target.movementState !== 'SENT' && target.movementState !== 'CRISIS' && target.movementState !== 'LEAVING') {
         target.movementState = 'EDGE';
+      }
+    }
+
+    // Soothe leaveIntent for CARED members
+    for (const p of communityMembers) {
+      if (p.careStatus === 'CARED' && (p.leaveIntent || 0) > 0 && !p.beingHeldById) {
+        p.leaveIntent = Math.max(0, (p.leaveIntent || 0) - 5 * dt);
       }
     }
 
@@ -155,8 +166,8 @@ export class CareSystem {
         if (s.burnout >= 55 && !s.need) {
           s.need = {
             type: 'WEARY',
-            duration: 25,
-            maxDuration: 25,
+            duration: 70,
+            maxDuration: 70,
             description: '과도한 돌봄으로 영적 소진에 직면했습니다.',
           };
         }

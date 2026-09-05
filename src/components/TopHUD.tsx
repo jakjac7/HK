@@ -46,8 +46,9 @@ export const TopHUD: React.FC<TopHUDProps> = ({
   const { timeElapsed, isPaused, gameSpeed, isReleaseActive, communities, people, mapId } =
     engine.state;
 
-  const minutes = Math.floor(timeElapsed / 60);
-  const seconds = Math.floor(timeElapsed % 60);
+  const remainingTime = Math.max(0, 600 - timeElapsed);
+  const minutes = Math.floor(remainingTime / 60);
+  const seconds = Math.floor(remainingTime % 60);
   const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
   let phaseShort = '개척';
@@ -66,9 +67,9 @@ export const TopHUD: React.FC<TopHUDProps> = ({
     phaseFull = '지경의 확장 (파송)';
     phaseDesc = '성숙한 제자를 세워 또 다른 선교지로 분립 개척을 준비합니다.';
   } else if (timeElapsed >= 540) {
-    phaseShort = '손놓음';
-    phaseFull = '성령께 온전히 맡겨드림 (손 놓음)';
-    phaseDesc = '인위적 개입을 멈추고 교회가 자생하는 자율 생명력을 지켜봅니다.';
+    phaseShort = '맡겨드림';
+    phaseFull = '성령께 온전히 맡겨드림';
+    phaseDesc = '인위적 개입을 멈추고 교회가 자생하는 성령충만을 지켜봅니다.';
   }
 
   const primaryComm = communities[0] || null;
@@ -165,9 +166,9 @@ export const TopHUD: React.FC<TopHUDProps> = ({
           <Tooltip
             content={
               <div>
-                <p className="font-bold text-amber-300">사역 경과 시간: {timeStr}</p>
+                <p className="font-bold text-amber-300">남은 사역 시간: {timeStr}</p>
                 <p className="text-white/70 mt-0.5">
-                  09:30에 성령께 온전히 맡겨드리는 자율 시험이 진행됩니다.
+                  남은 시간이 1:00가 되면 성령께 온전히 맡겨드리는 자율 시험이 진행됩니다.
                 </p>
               </div>
             }
@@ -355,7 +356,7 @@ export const TopHUD: React.FC<TopHUDProps> = ({
             <Tooltip
               content={
                 <div>
-                  <p className="font-bold text-rose-300">손을 놓음 (자율 생명력 시험)</p>
+                  <p className="font-bold text-rose-300">성령께 온전히 맡겨드림 (자율 운행)</p>
                   <p className="text-white/70 mt-0.5">
                     인위적인 개입을 멈추고 교회가 스스로 일어서는 생명력을 확인합니다.
                   </p>
@@ -367,7 +368,7 @@ export const TopHUD: React.FC<TopHUDProps> = ({
                 onClick={onTriggerRelease}
                 className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-sm transition-colors cursor-pointer"
               >
-                손놓음
+                맡겨드림
               </button>
             </Tooltip>
           )}

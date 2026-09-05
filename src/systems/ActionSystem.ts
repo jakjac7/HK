@@ -62,7 +62,7 @@ export class ActionSystem {
     }
 
     if (this.attention < action.attentionCost) {
-      return { success: false, message: '목회적 시선(주의 집중)이 부족합니다.' };
+      return { success: false, message: '행동력(시선 포인트)이 부족합니다.' };
     }
 
     // Consume attention and start cooldown
@@ -72,7 +72,7 @@ export class ActionSystem {
     if (targetPerson) {
       targetPerson.visualEffect = {
         type: actionId,
-        timer: 3.0, // 3 seconds visual effect
+        timer: actionId === 'CARE' ? 6.0 : 3.0, // Increased for CARE
       };
     }
 
@@ -99,53 +99,34 @@ export class ActionSystem {
         } else {
           commMembers.forEach(p => {
             p.trust = Math.min(100, p.trust + 15);
+            if (p.need?.type === 'TENSION') p.need = null; // Heal community-wide tension
           });
           community.stats.unity = Math.min(100, community.stats.unity + 10);
-          specificMsg = '온 공동체가 함께 떡을 떼며 하나 됨의 기쁨을 누렸습니다.';
+          specificMsg = '온 공동체가 함께 떡을 떼며 하나 됨의 기쁨을 누리고 갈등을 해소했습니다.';
         }
         break;
       }
 
       case 'WORD': {
-        // Boosts Gospel depth (formation)
-        const depthGain = hasTeacher ? 22 : 14; // Teacher amplifies formation
-        if (targetPerson) {
-          targetPerson.depth = Math.min(100, targetPerson.depth + depthGain);
-          targetPerson.readiness = Math.min(100, targetPerson.readiness + 12);
-          if (targetPerson.need?.type === 'QUESTION') targetPerson.need = null;
-          
-          // Upgrades calling if INTERCESSOR or WORSHIPPER or null
-          if (targetPerson.calling === null) {
-            if (targetPerson.depth > 40 && Math.random() < 0.6) {
-              const upgradeOptions: NonNullable<CallingType>[] = ['INTERCESSOR', 'WORSHIPPER'];
-              const newCalling = upgradeOptions[Math.floor(Math.random() * upgradeOptions.length)];
-              targetPerson.calling = newCalling;
-              targetPerson.revealGlowTimer = 3.5;
-              specificMsg = `${targetPerson.name} 성도가 훈련을 통해 ${newCalling} 사역자로 첫 발을 내딛었습니다!`;
-            } else {
-              specificMsg = `${targetPerson.name} 성도에게 생명의 말씀을 나누어 복음의 농도가 깊어졌습니다.${hasTeacher ? ' (교사의 동역으로 효과 ↑)' : ''}`;
-            }
-          } else if (targetPerson.calling === 'INTERCESSOR' || targetPerson.calling === 'WORSHIPPER') {
-            if (targetPerson.depth > 75 && targetPerson.readiness > 75 && Math.random() < 0.6) {
-              const upgradeOptions: NonNullable<CallingType>[] = ['EVANGELIST', 'SHEPHERD', 'TEACHER'];
-              const newCalling = upgradeOptions[Math.floor(Math.random() * upgradeOptions.length)];
-              targetPerson.calling = newCalling;
-              targetPerson.revealGlowTimer = 3.5;
-              specificMsg = `${targetPerson.name} 성도가 양육을 통해 ${newCalling} 사역자로 성장했습니다!`;
-            } else {
-              specificMsg = `${targetPerson.name} 성도에게 생명의 말씀을 나누어 복음의 농도가 깊어졌습니다.${hasTeacher ? ' (교사의 동역으로 효과 ↑)' : ''}`;
-            }
-          } else {
-            specificMsg = `${targetPerson.name} 성도에게 생명의 말씀을 나누어 복음의 농도가 깊어졌습니다.${hasTeacher ? ' (교사의 동역으로 효과 ↑)' : ''}`;
-          }
-        } else {
-          commMembers.forEach(p => {
-            p.depth = Math.min(100, p.depth + (hasTeacher ? 12 : 8));
-          });
-          community.stats.formation = Math.min(100, community.stats.formation + 15);
-          community.stats.integrity = Math.min(100, community.stats.integrity + 15);
-          specificMsg = `공동체에 진리의 말씀을 선포하여 복음의 깊이가 확고해졌습니다.${hasTeacher ? ' (교사의 동역으로 효과 ↑)' : ''}`;
-        }
+        // Boosts Gospel depth (formation) across the ENTIRE community (AoE Skill)
+        const depthGain = hasTeacher ? 24 : 16;
+        commMembers.forEach(p => {
+          p.depth = Math.min(100, p.depth + depthGain);
+          p.readiness = Math.min(100, p.readiness + 10);
+          p.trust = Math.min(100, p.trust + 8);
+          p.stability = Math.min(100, p.stability + 6);
+          p.visualEffect = { type: 'WORD', timer: 4.0 };
+        });
+
+        community.stats.formation = Math.min(100, community.stats.formation + (hasTeacher ? 22 : 15));
+        community.stats.integrity = Math.min(100, community.stats.integrity + 15);
+        
+        // Teachers in the community rejoice in the Word proclamation
+        commMembers.filter(p => p.calling === 'TEACHER').forEach(t => {
+          t.contribution.trainedCount++;
+        });
+
+        specificMsg = `공동체 전체에 생명의 말씀을 광역 선포하여 모든 성도의 복음 깊이가 충만해졌습니다!${hasTeacher ? ' (교사의 강단 동역으로 말씀의 능력이 배가되었습니다)' : ''}`;
         break;
       }
 
@@ -174,25 +155,41 @@ export class ActionSystem {
       }
 
       case 'CARE': {
-        // Heals Weariness & bridges care gap
+        // Heals Weariness & bridges care gap & resolves QUESTION (말씀에 대한 확신 부족은 심방으로 대응)
         if (targetPerson) {
-          targetPerson.burnout = Math.max(0, targetPerson.burnout - 35);
           targetPerson.stability = Math.min(100, targetPerson.stability + 30);
           targetPerson.leaveIntent = 0;
           if (targetPerson.careStatus === 'UNCARED') targetPerson.careStatus = 'CARED';
-          if (targetPerson.need?.type === 'WEARY' || targetPerson.need?.type === 'NEWCOMER') {
+          
+          if (targetPerson.need?.type === 'QUESTION') {
+            // Personal pastoral visitation resolves spiritual doubt / lack of conviction
             targetPerson.need = null;
+            targetPerson.depth = Math.min(100, targetPerson.depth + 25);
+            targetPerson.trust = Math.min(100, targetPerson.trust + 25);
+            targetPerson.burnout = Math.max(0, targetPerson.burnout - 20);
+            targetPerson.visualEffect = { type: 'CARE', timer: 6.0 };
+            specificMsg = `${targetPerson.name} 성도를 1:1 심방하여 말씀에 대한 깊은 의문과 회의를 풀어주고 확고한 믿음의 확신을 세웠습니다.${hasShepherd ? ' (목자의 돌봄 협력)' : ''}`;
+          } else if (targetPerson.need?.type === 'WEARY' || targetPerson.need?.type === 'NEWCOMER') {
+            targetPerson.burnout = Math.max(0, targetPerson.burnout - 40);
+            targetPerson.need = null;
+            targetPerson.visualEffect = { type: 'CARE', timer: 6.0 };
+            specificMsg = `${targetPerson.name} 성도를 목회적으로 심방하여 상처를 보듬고 안정을 되찾았습니다.${hasShepherd ? ' (목자의 돌봄 협력)' : ''}`;
+          } else {
+            targetPerson.burnout = Math.max(0, targetPerson.burnout - 30);
+            targetPerson.visualEffect = { type: 'CARE', timer: 6.0 };
+            specificMsg = `${targetPerson.name} 성도를 사랑으로 심방하여 교제의 온기를 나누었습니다.`;
           }
-          specificMsg = `${targetPerson.name} 성도를 목회적으로 심방하여 상처를 보듬고 안정을 되찾았습니다.${hasShepherd ? ' (목자의 돌봄 협력)' : ''}`;
         } else {
-          const uncaredOrWeary = commMembers.filter(p => p.careStatus === 'UNCARED' || p.burnout > 50);
+          const uncaredOrWeary = commMembers.filter(p => p.careStatus === 'UNCARED' || p.burnout > 50 || p.need?.type === 'QUESTION');
           uncaredOrWeary.forEach(p => {
             p.burnout = Math.max(0, p.burnout - 20);
             p.stability = Math.min(100, p.stability + 15);
             p.careStatus = 'CARED';
+            if (p.need?.type === 'QUESTION') p.need = null;
+            p.visualEffect = { type: 'CARE', timer: 6.0 };
           });
           community.stats.care = Math.min(100, community.stats.care + 15);
-          specificMsg = '돌봄이 절실한 지체들을 찾아가 그리스도의 사랑으로 위로했습니다.';
+          specificMsg = '돌봄이 절실한 지체들을 찾아가 그리스도의 사랑으로 위로하고 의문을 풀어주었습니다.';
         }
         break;
       }

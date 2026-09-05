@@ -67,7 +67,7 @@ export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend })
             </div>
             <div>
               <h3 className="text-base font-serif font-bold tracking-tight text-[#F5F5F5]">
-                분립 개척과 선교적 파송
+                선교적 리더 파송
               </h3>
               <p className="text-xs text-white/50">새로운 지경에 복음의 생명력 있는 교회를 개척합니다</p>
             </div>
@@ -156,7 +156,7 @@ export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend })
 
         {/* Step 2: Select Direction */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-serif font-semibold text-white/70">2. 분립 개척 방향</label>
+          <label className="text-xs font-serif font-semibold text-white/70">2. 파송 방향</label>
           <div className="grid grid-cols-4 gap-2">
             {[
               { dir: 'NORTH' as const, label: '북쪽', icon: <ArrowUp className="w-3.5 h-3.5" /> },

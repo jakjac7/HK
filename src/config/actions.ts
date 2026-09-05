@@ -14,17 +14,17 @@ export const BASE_ACTIONS_CONFIG: Record<ActionId, Omit<PlayerAction, 'currentCo
     cooldown: 15,
     attentionCost: 1,
     icon: 'Utensils',
-    targetType: 'PERSON',
+    targetType: 'ANY', // Changed to ANY for community-wide action
   },
   WORD: {
     id: 'WORD',
-    koreanName: '말씀',
-    subtitle: '복음의 농도 심화',
-    description: '생명의 진리를 선포하여 복음의 깊이를 더하고, 공동체 안에 스며든 왜곡과 혼란을 바로잡습니다.',
+    koreanName: '말씀 선포 (광역)',
+    subtitle: '공동체 전체 복음 깊이 증진',
+    description: '공동체 전체에 하나님의 생명의 말씀을 힘있게 선포합니다. 모든 성도의 복음 깊이(Depth)가 크게 상승하고 교회의 진리성이 견고해집니다.',
     cooldown: 25,
     attentionCost: 1,
     icon: 'BookOpen',
-    targetType: 'PERSON',
+    targetType: 'STRATEGIC', // Community-wide AoE Skill
   },
   PRAYER: {
     id: 'PRAYER',
@@ -48,9 +48,9 @@ export const BASE_ACTIONS_CONFIG: Record<ActionId, Omit<PlayerAction, 'currentCo
   },
   CARE: {
     id: 'CARE',
-    koreanName: '돌봄',
-    subtitle: '지친 영혼 심방',
-    description: '목자의 손길로 상처받거나 방치된 지체를 따뜻하게 품어 정서적 안정을 주고 이탈을 막습니다.',
+    koreanName: '심방/돌봄',
+    subtitle: '말씀 확신 심방 & 치유',
+    description: '말씀에 확신이 흔들리거나 깊은 회의/의문(QUESTION)이 있는 지체를 1:1 심방하여 확신을 심어주고, 상처와 소진을 보듬어 이탈을 막습니다.',
     cooldown: 20,
     attentionCost: 1,
     icon: 'Heart',
@@ -58,9 +58,9 @@ export const BASE_ACTIONS_CONFIG: Record<ActionId, Omit<PlayerAction, 'currentCo
   },
   SEND: {
     id: 'SEND',
-    koreanName: '분립 개척',
+    koreanName: '리더 파송',
     subtitle: '새 지경으로 파송',
-    description: '성숙한 제자 리더를 세상의 열린 지경으로 믿음의 분립 개척을 위해 파송합니다.',
+    description: '성숙한 제자 리더를 세상의 열린 지경으로 보내어 새로운 공동체를 개척합니다.',
     cooldown: 60,
     attentionCost: 2,
     icon: 'Send',

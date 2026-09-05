@@ -42,15 +42,6 @@ export class CallingSystem {
       }
     });
 
-    // Req 3: First-time calling can only be INTERCESSOR or WORSHIPPER.
-    // Training/upgrading existing ones to Shepherd/Teacher/Evangelist will be handled elsewhere or via an action.
-    if (!person.calling) {
-      return Math.random() > 0.5 ? 'INTERCESSOR' : 'WORSHIPPER';
-    }
-
-    // If upgrading an existing calling:
-    const UPGRADE_CALLINGS: NonNullable<CallingType>[] = ['EVANGELIST', 'SHEPHERD', 'TEACHER'];
-    
     // Check for extreme shortage (0 of a critical role like SHEPHERD or TEACHER in a growing community)
     const totalPop = allCommunityPeople.length;
     if (totalPop >= 6 && counts.SHEPHERD === 0 && Math.random() < 0.85) {
@@ -60,18 +51,18 @@ export class CallingSystem {
       return 'TEACHER';
     }
 
-    // Weight computation for upgrades
+    // Weight computation
     const weights: Record<NonNullable<CallingType>, number> = {
       EVANGELIST: 20,
       SHEPHERD: 20,
       TEACHER: 20,
-      INTERCESSOR: 0,
-      WORSHIPPER: 0,
+      INTERCESSOR: 20,
+      WORSHIPPER: 20,
     };
 
-    const minCount = Math.min(counts.EVANGELIST, counts.SHEPHERD, counts.TEACHER);
+    const minCount = Math.min(...Object.values(counts));
 
-    UPGRADE_CALLINGS.forEach(c => {
+    ALL_CALLINGS.forEach(c => {
       const deficit = counts[c] - minCount;
       if (counts[c] === 0) {
         weights[c] += 30; // Strong boost if 0
@@ -83,19 +74,21 @@ export class CallingSystem {
     });
 
     // Special map adjustments can slightly influence calling emergence naturally:
-    // (e.g. if community has high uncared people, Shepherd weight receives organic priority)
     if (community.stats.uncaredCount > 0) {
       weights.SHEPHERD += 25;
     }
     if (community.drift?.type === 'DECEPTION') {
       weights.TEACHER += 20;
     }
+    if (community.drift?.type === 'BURNOUT') {
+      weights.INTERCESSOR += 20;
+    }
 
     // Weighted random pick
-    const totalWeight = UPGRADE_CALLINGS.reduce((acc, c) => acc + weights[c], 0);
+    const totalWeight = ALL_CALLINGS.reduce((acc, c) => acc + weights[c], 0);
     let rand = Math.random() * totalWeight;
 
-    for (const c of UPGRADE_CALLINGS) {
+    for (const c of ALL_CALLINGS) {
       if (rand < weights[c]) {
         return c;
       }
