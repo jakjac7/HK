@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { GameEngine } from '../simulation/engine';
+import { GameEngine, Particle } from '../simulation/engine';
 import { drawOrganicBlob } from '../simulation/communityBlob';
 import { CALLING_DEFINITIONS } from '../data/callings';
 import { Person, NeedType, Community } from '../types';
@@ -14,7 +14,9 @@ interface SimulationCanvasProps {
   engine: GameEngine;
   onSelectPerson: (person: Person | null) => void;
   selectedPersonId: string | null;
-  activeCardId: string | null;
+  activeActionId?: string | null;
+  activeCardId?: string | null;
+  onApplyActionOnPerson?: (targetPersonId: string) => void;
   onApplyCardOnPerson?: (targetPersonId: string) => void;
 }
 
@@ -22,7 +24,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   engine,
   onSelectPerson,
   selectedPersonId,
+  activeActionId,
   activeCardId,
+  onApplyActionOnPerson,
   onApplyCardOnPerson,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,6 +82,28 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
+    // Immediately calculate initial dimensions on mount to prevent black/empty frame
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 50 && rect.height > 50) {
+      const initW = Math.floor(rect.width);
+      const initH = Math.floor(rect.height);
+      setDimensions({ width: initW, height: initH });
+      engine.setWorldDimensions(initW, initH);
+
+      const primaryComm = engine.state.communities[0];
+      if (primaryComm) {
+        const cam = cameraRef.current;
+        cam.x = primaryComm.centerX;
+        cam.y = primaryComm.centerY;
+        cam.targetX = primaryComm.centerX;
+        cam.targetY = primaryComm.centerY;
+        const defaultZoom = Math.min(1.15, Math.max(0.75, Math.min(initW / 900, initH / 650)));
+        cam.zoom = defaultZoom;
+        cam.targetZoom = defaultZoom;
+        cam.isInitialized = true;
+      }
+    }
+
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
@@ -87,15 +113,15 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           setDimensions({ width: w, height: h });
           engine.setWorldDimensions(w, h);
 
-          // Center camera directly on the primary community
+          // Center camera directly on the primary community if not yet initialized
           const primaryComm = engine.state.communities[0];
           if (primaryComm) {
             const cam = cameraRef.current;
-            cam.targetX = primaryComm.centerX;
-            cam.targetY = primaryComm.centerY;
             if (!cam.isInitialized) {
               cam.x = primaryComm.centerX;
               cam.y = primaryComm.centerY;
+              cam.targetX = primaryComm.centerX;
+              cam.targetY = primaryComm.centerY;
               cam.zoom = 1.0;
               cam.targetZoom = 1.0;
               cam.isInitialized = true;
@@ -248,6 +274,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         drawPersonNode(ctx, p, p.id === selectedPersonId, !!activeCardId, time);
       }
 
+      // Draw Blessing Particles
+      if (engine.state.particles && engine.state.particles.length > 0) {
+        for (const pt of engine.state.particles) {
+          drawParticle(ctx, pt, time);
+        }
+      }
+
       ctx.restore(); // Restore from World Camera space
 
       animId = requestAnimationFrame(render);
@@ -284,6 +317,11 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
       }
 
+      if (activeActionId && clickedPerson && onApplyActionOnPerson) {
+        onApplyActionOnPerson(clickedPerson.id);
+        return;
+      }
+
       if (activeCardId && clickedPerson && onApplyCardOnPerson) {
         onApplyCardOnPerson(clickedPerson.id);
         return;
@@ -291,7 +329,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
       onSelectPerson(clickedPerson);
     },
-    [engine, activeCardId, onApplyCardOnPerson, onSelectPerson, screenToWorld]
+    [engine, activeActionId, activeCardId, onApplyActionOnPerson, onApplyCardOnPerson, onSelectPerson, screenToWorld]
   );
 
   // Mouse Gestures (Drag to pan, wheel to zoom, click to select)
@@ -428,9 +466,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       )}
 
       {/* Targeting Prompt */}
-      {activeCardId && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-black font-mono font-bold px-5 py-1.5 rounded-sm border border-amber-300 text-xs shadow-[0_0_20px_rgba(251,191,36,0.35)] pointer-events-none animate-pulse z-20">
-          지체를 탭하여 카드를 적용하세요
+      {(activeActionId || activeCardId) && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 bg-amber-400 text-black font-mono font-semibold px-4 py-1 rounded-full border border-amber-300 text-xs shadow-[0_4px_20px_rgba(251,191,36,0.4)] pointer-events-none animate-pulse z-20">
+          지체를 탭하여 사역을 행하세요
         </div>
       )}
 
@@ -490,17 +528,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             <Minus className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
-
-      {/* Floating Geometric Balance Status Pill */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md px-5 py-1.5 rounded-full border border-white/20 flex gap-3 sm:gap-5 items-center pointer-events-none shadow-lg text-xs z-10">
-        <span className="text-[10px] text-white/40 uppercase tracking-widest font-mono">
-          살아있는 성소
-        </span>
-        <div className="h-3 w-px bg-white/10" />
-        <span className="text-[11px] font-mono text-amber-200">
-          목회적 시선 회복: {Math.max(0, 8 - (engine.state.attentionTimer % 8)).toFixed(1)}초
-        </span>
       </div>
     </div>
   );
@@ -570,10 +597,11 @@ function drawBackgroundAmbience(
   ctx.restore();
 }
 
-// Helper: Relationship & Open Door connection paths
+// Helper: Relationship, Orbit, & Open Door connection paths
 function drawRelationshipTrails(ctx: CanvasRenderingContext2D, people: Person[]) {
   ctx.save();
   for (const p of people) {
+    // 1. Evangelist Outreach trail
     if (p.isExternal && p.externalState === 'FOLLOWING' && p.contactWithId) {
       const guide = people.find(g => g.id === p.contactWithId);
       if (guide) {
@@ -581,10 +609,44 @@ function drawRelationshipTrails(ctx: CanvasRenderingContext2D, people: Person[])
         ctx.setLineDash([3, 5]);
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(guide.x, guide.y);
-        ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)'; // Cyan outreach thread
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.4)'; // Cyan outreach thread
         ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.setLineDash([]);
+      }
+    }
+    
+    // 2. Shepherd / Leader Orbit trail
+    if (!p.isExternal && !p.calling) {
+      let leader = null;
+      if (p.caregiverId) {
+        leader = people.find(g => g.id === p.caregiverId);
+      } else {
+        let bestLeader: Person | null = null;
+        let bestScore = -1;
+        for (const other of people) {
+          if (other.communityId === p.communityId && other.id !== p.id && other.calling !== null) {
+            const score = (other.generation === 0 ? 1000 : 0) + other.readiness;
+            if (score > bestScore) {
+              bestScore = score;
+              bestLeader = other;
+            }
+          }
+        }
+        leader = bestLeader;
+      }
+      
+      if (leader) {
+        const d = Math.hypot(p.x - leader.x, p.y - leader.y);
+        if (d < 150) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(leader.x, leader.y);
+          // Very subtle gradient or solid line
+          ctx.strokeStyle = p.caregiverId ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
       }
     }
   }
@@ -635,34 +697,124 @@ function drawPersonNode(
     ? '#f59e0b'
     : `hsl(${baseHue}, ${baseSat + 10}%, ${baseLight + 25}%)`;
 
-  // Draw Generation Rings (G1, G2, G3)
-  if (p.generation > 0 && !p.isExternal) {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, radius + 4, 0, Math.PI * 2);
-    ctx.strokeStyle =
-      p.generation === 3
-        ? 'rgba(251, 191, 36, 0.95)' // G3 radiant gold
-        : p.generation === 2
-        ? 'rgba(167, 139, 250, 0.85)' // G2 purple disciple
-        : 'rgba(255, 255, 255, 0.35)'; // G1 white ring
-    ctx.lineWidth = p.generation === 3 ? 2.2 : 1.2;
-    ctx.stroke();
-
-    if (p.generation === 3) {
-      // Shimmering aura for 3rd generation
+  // Draw Generation Rings (G0 개척멤버, G1, G2, G3)
+  if (!p.isExternal) {
+    if (p.generation === 0) {
+      // G0 Pioneer (개척멤버): Warm foundation amber halo
       ctx.beginPath();
-      ctx.arc(p.x, p.y, radius + 7, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
-      ctx.lineWidth = 1;
+      ctx.arc(p.x, p.y, radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle =
+        p.generation === 3
+          ? 'rgba(251, 191, 36, 0.95)' // G3 radiant gold
+          : p.generation === 2
+          ? 'rgba(167, 139, 250, 0.85)' // G2 purple disciple
+          : 'rgba(255, 255, 255, 0.35)'; // G1 white ring
+      ctx.lineWidth = p.generation === 3 ? 2.2 : 1.2;
+      ctx.stroke();
+
+      if (p.generation === 3) {
+        // Shimmering aura for 3rd generation
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius + 7, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
+  }
+
+  // Visual cue for UNCARED persons: Urgent dashed warning ring
+  if (!p.isExternal && p.careStatus === 'UNCARED') {
+    const pulse = 1 + Math.sin(time * 0.008) * 0.15;
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([3, 3]);
+    ctx.arc(p.x, p.y, (radius + 6) * pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(244, 63, 94, 0.85)'; // Rose-red warning
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Visual cue for SHEPHERD: Pastoral care aura
+  if (p.calling === 'SHEPHERD' && !p.isExternal) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)'; // Emerald care aura
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Visual Feedback for Skills (Action Effects)
+  if (p.visualEffect && p.visualEffect.timer > 0) {
+    const vTimer = p.visualEffect.timer;
+    // 3.0s total. Expand out quickly, fade out slowly
+    const progress = 1 - (vTimer / 3.0);
+    const effectRadius = radius + 4 + progress * 25;
+    const alpha = Math.max(0, (1 - progress) * 0.8);
+    
+    let effectColor = 'rgba(255, 255, 255, '; // Default
+    if (p.visualEffect.type === 'CARE') effectColor = 'rgba(52, 211, 153, '; // Emerald
+    if (p.visualEffect.type === 'WORD') effectColor = 'rgba(96, 165, 250, '; // Blue
+    if (p.visualEffect.type === 'FELLOWSHIP') effectColor = 'rgba(251, 191, 36, '; // Amber
+    if (p.visualEffect.type === 'PRAYER') effectColor = 'rgba(167, 139, 250, '; // Purple
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, effectRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = effectColor + alpha + ')';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Inner filled glow
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius + 2 + progress * 10, 0, Math.PI * 2);
+    ctx.fillStyle = effectColor + (alpha * 0.4) + ')';
+    ctx.fill();
+    ctx.restore();
   }
 
   // Selected or Targeting pulsing glow
   if (isSelected) {
+    const pulse = 1 + 0.1 * Math.sin(time * 0.005);
+    const pulseRadius = (radius + 12) * pulse;
+
+    // Glowing ring
     ctx.beginPath();
-    ctx.arc(p.x, p.y, radius + 8, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+    ctx.arc(p.x, p.y, pulseRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Target crosshairs
+    const cSize = pulseRadius + 4;
+    const len = 6;
+    ctx.beginPath();
+    // Top Left
+    ctx.moveTo(p.x - cSize, p.y - cSize + len);
+    ctx.lineTo(p.x - cSize, p.y - cSize);
+    ctx.lineTo(p.x - cSize + len, p.y - cSize);
+    // Top Right
+    ctx.moveTo(p.x + cSize - len, p.y - cSize);
+    ctx.lineTo(p.x + cSize, p.y - cSize);
+    ctx.lineTo(p.x + cSize, p.y - cSize + len);
+    // Bottom Left
+    ctx.moveTo(p.x - cSize, p.y + cSize - len);
+    ctx.lineTo(p.x - cSize, p.y + cSize);
+    ctx.lineTo(p.x - cSize + len, p.y + cSize);
+    // Bottom Right
+    ctx.moveTo(p.x + cSize - len, p.y + cSize);
+    ctx.lineTo(p.x + cSize, p.y + cSize);
+    ctx.lineTo(p.x + cSize, p.y + cSize - len);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 1)';
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -777,5 +929,69 @@ function drawNeedSignal(
       ctx.fillText('▲', x, y + bob);
       break;
   }
+  ctx.restore();
+}
+
+// Helper: Draw visual blessing particle
+function drawParticle(ctx: CanvasRenderingContext2D, pt: Particle, time: number) {
+  ctx.save();
+  
+  // Easing function for smooth curve
+  const easeProgress = 1 - Math.pow(1 - pt.progress, 3);
+  
+  // Path math: Bezier curve for organic arc
+  const dx = pt.targetX - pt.sourceX;
+  const dy = pt.targetY - pt.sourceY;
+  
+  // Arch height based on distance
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const archHeight = Math.min(60, dist * 0.4);
+  
+  // Normal vector for arch
+  const nx = -dy / dist;
+  const ny = dx / dist;
+  
+  // Control point
+  const cx = pt.sourceX + dx * 0.5 + nx * archHeight;
+  const cy = pt.sourceY + dy * 0.5 + ny * archHeight;
+  
+  // Current position via Quadratic Bezier
+  const t = easeProgress;
+  const mt = 1 - t;
+  const x = mt * mt * pt.sourceX + 2 * mt * t * cx + t * t * pt.targetX;
+  const y = mt * mt * pt.sourceY + 2 * mt * t * cy + t * t * pt.targetY;
+  
+  // Pulse & fading
+  const alpha = 1 - Math.pow(t, 4); // Fades out at the very end
+  const radius = 3 + Math.sin(time * 0.01 + pt.id.charCodeAt(0)) * 1.5;
+  
+  // Glow effect
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = '#fbbf24'; // amber-400
+  
+  ctx.fillStyle = `rgba(253, 230, 138, ${alpha})`; // amber-200
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Secondary core
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Trail
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  const trailT = Math.max(0, t - 0.15);
+  const trailMt = 1 - trailT;
+  const tx = trailMt * trailMt * pt.sourceX + 2 * trailMt * trailT * cx + trailT * trailT * pt.targetX;
+  const ty = trailMt * trailMt * pt.sourceY + 2 * trailMt * trailT * cy + trailT * trailT * pt.targetY;
+  ctx.lineTo(tx, ty);
+  ctx.strokeStyle = `rgba(253, 230, 138, ${alpha * 0.5})`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
   ctx.restore();
 }

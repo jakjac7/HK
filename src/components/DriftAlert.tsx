@@ -9,15 +9,16 @@ import { AlertCircle, Eye, ShieldAlert, Sparkles } from 'lucide-react';
 
 interface DriftAlertProps {
   communities: Community[];
+  onResolveDrift?: (commId: string, type: 'DECEPTION' | 'DIVISION' | 'BURNOUT') => void;
 }
 
-export const DriftAlert: React.FC<DriftAlertProps> = ({ communities }) => {
+export const DriftAlert: React.FC<DriftAlertProps> = ({ communities, onResolveDrift }) => {
   const activeDrifts = communities.filter(c => c.drift !== null);
 
   if (activeDrifts.length === 0) return null;
 
   return (
-    <div id="drift-alerts-container" className="absolute top-16 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
+    <div id="drift-alerts-container" className="absolute top-20 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
       {activeDrifts.map(comm => {
         const drift = comm.drift!;
         const isDeception = drift.type === 'DECEPTION';
@@ -57,9 +58,12 @@ export const DriftAlert: React.FC<DriftAlertProps> = ({ communities }) => {
               </div>
             </div>
 
-            <div className="shrink-0 text-[10px] font-mono font-semibold px-2 py-1 rounded-sm bg-black/50 border border-white/10 text-white/80">
-              {isDeception ? '복음 진리 선포 필요' : isDivision ? '십자가 화해 필요' : '중보기도와 안식 필요'}
-            </div>
+            <button
+              onClick={() => onResolveDrift && onResolveDrift(comm.id, drift.type)}
+              className="shrink-0 text-[10px] font-mono font-semibold px-2 py-1 rounded-sm bg-white/10 hover:bg-white/20 border border-white/20 text-white/90 transition-colors cursor-pointer active:scale-95"
+            >
+              {isDeception ? '복음 진리 선포 (시선 -1)' : isDivision ? '십자가 화해 필요 (시선 -1)' : '중보기도/안식 (시선 -1)'}
+            </button>
           </div>
         );
       })}

@@ -29,7 +29,8 @@ export function calculatePersonSteering(
   communities: Community[],
   world: WorldBounds,
   dt: number,
-  isReleaseActive: boolean
+  isReleaseActive: boolean,
+  isSunday: boolean = false
 ): { fx: number; fy: number; maxSpeed: number } {
   let fx = 0;
   let fy = 0;
@@ -46,7 +47,7 @@ export function calculatePersonSteering(
   const commPriority: CommunityPriority = comm ? comm.priority : 'ROOT';
 
   // 1. Separation force (avoid overlapping with neighbors)
-  const separationRadius = 22;
+  const separationRadius = 32; // Increased to prevent too much overlap
   let sepX = 0;
   let sepY = 0;
   let sepCount = 0;
@@ -56,8 +57,8 @@ export function calculatePersonSteering(
     const d = distance(person.x, person.y, other.x, other.y);
     if (d > 0 && d < separationRadius) {
       const push = (separationRadius - d) / separationRadius;
-      sepX += ((person.x - other.x) / d) * push * 65;
-      sepY += ((person.y - other.y) / d) * push * 65;
+      sepX += ((person.x - other.x) / d) * push * 90; // Increased push force
+      sepY += ((person.y - other.y) / d) * push * 90;
       sepCount++;
     }
   }
@@ -119,6 +120,48 @@ export function calculatePersonSteering(
       targetCenterX = comm.centerX + (hash === 0 ? -commRadius * 0.55 : commRadius * 0.55);
     }
 
+    // SUNDAY SCRUM: Everyone gathers tightly to the center to worship
+    if (isSunday && !isDivided) {
+      if (distToCenter > 15) {
+        fx += ((targetCenterX - person.x) / distToCenter) * 60;
+        fy += ((targetCenterY - person.y) / distToCenter) * 60;
+      }
+      // Add slight rotation for scrum effect
+      fx += (- (targetCenterY - person.y) / distToCenter) * 15;
+      fy += ((targetCenterX - person.x) / distToCenter) * 15;
+      
+      // World bounds containment
+      const { bx, by } = getBoundaryPush(person.x, person.y, world);
+      fx += bx;
+      fy += by;
+      return { fx, fy, maxSpeed };
+    }
+
+    // Generic Evangelism for ALL community members (Req 1)
+    // Evangelists have much higher efficiency and range, but everyone can evangelize if they bump into an external
+    let contactRange = 28;
+    let contactChance = 0.03;
+    if (person.calling === 'EVANGELIST') {
+      contactRange = 45;
+      contactChance = 0.4;
+    } else if (person.calling === 'WORSHIPPER' || person.calling === 'INTERCESSOR') {
+      contactRange = 38;
+      contactChance = 0.2; // Worshippers and Intercessors also actively reach out
+    }
+
+    for (const other of allPeople) {
+      if (other.isExternal && other.externalState !== 'CONTACTED' && other.externalState !== 'FOLLOWING') {
+        const d = distance(person.x, person.y, other.x, other.y);
+        if (d < contactRange) {
+          if (Math.random() < contactChance * dt) {
+            other.externalState = 'CONTACTED';
+            other.contactWithId = person.id;
+            person.contribution.reachedCount++;
+          }
+        }
+      }
+    }
+
     // Calling-specific Movement Biases (Core Product Invariants!)
     switch (person.calling) {
       case 'EVANGELIST': {
@@ -128,7 +171,7 @@ export function calculatePersonSteering(
         let minD = Infinity;
 
         for (const other of allPeople) {
-          if (other.isExternal && other.externalState !== 'FOLLOWING') {
+          if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
             const d = distance(person.x, person.y, other.x, other.y);
             if (d < minD) {
               minD = d;
@@ -139,21 +182,14 @@ export function calculatePersonSteering(
 
         const goMultiplier = commPriority === 'GO' ? 1.5 : 1.0;
 
-        if (externalTarget && minD < commRadius * 2.8) {
+        if (externalTarget && minD < commRadius * 3.5) {
           // Evangelist steps out to meet external target
           fx += ((externalTarget.x - person.x) / minD) * 55 * goMultiplier;
           fy += ((externalTarget.y - person.y) / minD) * 55 * goMultiplier;
-
-          // If close enough, initiate contact
-          if (minD < 32 && externalTarget.externalState !== 'CONTACTED') {
-            externalTarget.externalState = 'CONTACTED';
-            externalTarget.contactWithId = person.id;
-            person.contribution.reachedCount++;
-          }
         } else {
           // Patrol between edge and outside
           const angle = (person.wobbleOffset + performance.now() * 0.0008) % (Math.PI * 2);
-          const orbitR = commRadius * (0.85 + 0.35 * Math.sin(performance.now() * 0.0015));
+          const orbitR = commRadius * (0.85 + 0.5 * Math.sin(performance.now() * 0.0015));
           const ox = targetCenterX + Math.cos(angle) * orbitR;
           const oy = targetCenterY + Math.sin(angle) * orbitR;
           const od = distance(person.x, person.y, ox, oy);
@@ -174,6 +210,7 @@ export function calculatePersonSteering(
           if (other.communityId === comm.id && other.id !== person.id) {
             const dFromCenter = distance(other.x, other.y, comm.centerX, comm.centerY);
             let score = 0;
+            if (other.careStatus === 'UNCARED') score += 60; // Highest priority for uncared
             if (other.need?.type === 'NEWCOMER') score += 50;
             if (other.stability < 45) score += 40;
             if (other.need?.type === 'TENSION') score += 35;
@@ -186,25 +223,30 @@ export function calculatePersonSteering(
           }
         }
 
-        const careMultiplier = commPriority === 'CARE' ? 1.4 : 1.0;
+        const isOverloaded = (person.careLoad || 0) >= 5;
+        const careMultiplier = (commPriority === 'CARE' ? 1.4 : 1.0) * (isOverloaded ? 1.35 : 1.0);
 
         if (vulnerableTarget) {
           const d = distance(person.x, person.y, vulnerableTarget.x, vulnerableTarget.y);
           if (d > 15) {
-            fx += ((vulnerableTarget.x - person.x) / d) * 50 * careMultiplier;
-            fy += ((vulnerableTarget.y - person.y) / d) * 50 * careMultiplier;
+            fx += ((vulnerableTarget.x - person.x) / d) * (isOverloaded ? 65 : 50) * careMultiplier;
+            fy += ((vulnerableTarget.y - person.y) / d) * (isOverloaded ? 65 : 50) * careMultiplier;
           }
           // Shepherd brings retention & stability
-          if (d < 30) {
-            vulnerableTarget.stability = Math.min(100, vulnerableTarget.stability + 15 * dt);
-            vulnerableTarget.trust = Math.min(100, vulnerableTarget.trust + 10 * dt);
+          if (d < 32) {
+            vulnerableTarget.stability = Math.min(100, vulnerableTarget.stability + 18 * dt);
+            vulnerableTarget.trust = Math.min(100, vulnerableTarget.trust + 12 * dt);
+            if (vulnerableTarget.careStatus === 'UNCARED') {
+              vulnerableTarget.careStatus = 'CARED';
+            }
             person.contribution.caredCount++;
           }
         } else {
-          // Patrol the edge perimeter
-          const angle = (person.wobbleOffset + performance.now() * 0.0006) % (Math.PI * 2);
-          const ox = targetCenterX + Math.cos(angle) * (commRadius * 0.78);
-          const oy = targetCenterY + Math.sin(angle) * (commRadius * 0.78);
+          // Patrol in and out freely
+          const angle = (person.wobbleOffset + performance.now() * (isOverloaded ? 0.0012 : 0.0006)) % (Math.PI * 2);
+          const patrolRadius = commRadius * (0.8 + 0.6 * Math.sin(performance.now() * 0.0008)); // Roams from 0.2x to 1.4x radius
+          const ox = targetCenterX + Math.cos(angle) * patrolRadius;
+          const oy = targetCenterY + Math.sin(angle) * patrolRadius;
           const od = distance(person.x, person.y, ox, oy);
           if (od > 5) {
             fx += ((ox - person.x) / od) * 40 * careMultiplier;
@@ -269,6 +311,26 @@ export function calculatePersonSteering(
       }
 
       case 'INTERCESSOR': {
+        if (commPriority === 'GO') {
+          // In GO priority, Intercessors also seek external targets for mission
+          let externalTarget: Person | null = null;
+          let minD = Infinity;
+          for (const other of allPeople) {
+            if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
+              const d = distance(person.x, person.y, other.x, other.y);
+              if (d < minD) {
+                minD = d;
+                externalTarget = other;
+              }
+            }
+          }
+          if (externalTarget && minD < commRadius * 2.5) {
+            fx += ((externalTarget.x - person.x) / minD) * 45;
+            fy += ((externalTarget.y - person.y) / minD) * 45;
+            break; // Skip normal behavior
+          }
+        }
+
         // Crisis & Burnout absorption
         let crisisTarget: Person | null = null;
         let maxCrisis = 0;
@@ -310,6 +372,26 @@ export function calculatePersonSteering(
       }
 
       case 'WORSHIPPER': {
+        if (commPriority === 'GO') {
+          // In GO priority, Worshippers also seek external targets for mission
+          let externalTarget: Person | null = null;
+          let minD = Infinity;
+          for (const other of allPeople) {
+            if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
+              const d = distance(person.x, person.y, other.x, other.y);
+              if (d < minD) {
+                minD = d;
+                externalTarget = other;
+              }
+            }
+          }
+          if (externalTarget && minD < commRadius * 2.5) {
+            fx += ((externalTarget.x - person.x) / minD) * 45;
+            fy += ((externalTarget.y - person.y) / minD) * 45;
+            break; // Skip normal behavior
+          }
+        }
+
         // Gathers scattered members to center / creates worship ripples
         const d = distance(person.x, person.y, targetCenterX, targetCenterY);
         if (d > 18) {
@@ -332,16 +414,91 @@ export function calculatePersonSteering(
       }
 
       default: {
-        // Generic member: Stay comfortably inside blob, wander organically
-        const wanderAngle = (person.wobbleOffset + performance.now() * 0.0005) % (Math.PI * 2);
-        fx += Math.cos(wanderAngle) * 16;
-        fy += Math.sin(wanderAngle) * 16;
+        // Generic member or seeker
+        const isUncared = person.careStatus === 'UNCARED';
 
-        // Attract toward community center if wandering too far out
-        if (distToCenter > commRadius * 0.65) {
-          const pull = (distToCenter - commRadius * 0.65) / (commRadius * 0.35);
-          fx += ((targetCenterX - person.x) / distToCenter) * 45 * pull;
-          fy += ((targetCenterY - person.y) / distToCenter) * 45 * pull;
+        // Uncared persons drift towards community edge and jitter nervously
+        if (isUncared) {
+          const edgeAngle = (person.wobbleOffset + performance.now() * 0.0015) % (Math.PI * 2);
+          const edgeDist = commRadius * 0.86;
+          const targetEdgeX = targetCenterX + Math.cos(edgeAngle) * edgeDist;
+          const targetEdgeY = targetCenterY + Math.sin(edgeAngle) * edgeDist;
+          const dToEdge = distance(person.x, person.y, targetEdgeX, targetEdgeY);
+
+          if (dToEdge > 10) {
+            fx += ((targetEdgeX - person.x) / dToEdge) * 35;
+            fy += ((targetEdgeY - person.y) / dToEdge) * 35;
+          }
+          // Nervous jitter looking for shepherd
+          fx += (Math.random() - 0.5) * 16;
+          fy += (Math.random() - 0.5) * 16;
+        } else {
+          // Find orbital center: Caregiver (Shepherd) first, or fallback to the Primary Leader (G0)
+          let orbitCenterTarget: Person | null = null;
+          
+          if (person.caregiverId) {
+            orbitCenterTarget = allPeople.find(p => p.id === person.caregiverId) || null;
+          }
+          
+          if (!orbitCenterTarget) {
+            // Find community's primary leader (generation 0 or highest readiness)
+            let bestLeader: Person | null = null;
+            let bestScore = -1;
+            for (const p of allPeople) {
+              if (p.communityId === comm.id && p.id !== person.id && p.calling !== null) {
+                const score = (p.generation === 0 ? 1000 : 0) + p.readiness;
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestLeader = p;
+                }
+              }
+            }
+            orbitCenterTarget = bestLeader;
+          }
+
+          if (orbitCenterTarget) {
+            // Orbital satellite mechanics around the leader
+            const dx = person.x - orbitCenterTarget.x;
+            const dy = person.y - orbitCenterTarget.y;
+            const distToLeader = Math.sqrt(dx * dx + dy * dy);
+            
+            // Optimal orbit radius based on person's unique hash
+            // WIDER ORBIT: Allow roaming up to 150 depending on hash and time
+            const baseOrbitR = 30 + (person.id.charCodeAt(0) % 50) + 40 * Math.sin(performance.now() * 0.0003 + person.id.charCodeAt(1)); 
+            
+            if (distToLeader > 0) {
+              // Radial force (keep at orbit distance)
+              const radialPull = (distToLeader - baseOrbitR) * 1.0; // Looser radial pull
+              fx += -(dx / distToLeader) * radialPull;
+              fy += -(dy / distToLeader) * radialPull;
+
+              // Tangential force (orbiting motion)
+              // Direction of orbit depends on ID hash
+              const direction = (person.id.charCodeAt(1) % 2 === 0) ? 1 : -1;
+              const speed = 10 + (person.id.charCodeAt(2) % 15);
+              
+              fx += (-dy / distToLeader) * speed * direction;
+              fy += (dx / distToLeader) * speed * direction;
+            }
+            
+            // Add some organic wobble
+            const wanderAngle = (person.wobbleOffset + performance.now() * 0.0005) % (Math.PI * 2);
+            fx += Math.cos(wanderAngle) * 12;
+            fy += Math.sin(wanderAngle) * 12;
+
+          } else {
+            // Normal member: Stay comfortably inside blob, wander organically
+            const wanderAngle = (person.wobbleOffset + performance.now() * 0.0005) % (Math.PI * 2);
+            fx += Math.cos(wanderAngle) * 20;
+            fy += Math.sin(wanderAngle) * 20;
+
+            // Attract toward community center if wandering too far out
+            if (distToCenter > commRadius * 1.8) {
+              const pull = (distToCenter - commRadius * 1.8) / (commRadius * 0.5);
+              fx += ((targetCenterX - person.x) / distToCenter) * 35 * pull;
+              fy += ((targetCenterY - person.y) / distToCenter) * 35 * pull;
+            }
+          }
         }
         break;
       }
@@ -349,10 +506,10 @@ export function calculatePersonSteering(
 
     // Community Boundary Containment (prevent member from flying away uncontrollably)
     if (person.calling !== 'EVANGELIST') {
-      if (distToCenter > commRadius * 0.95) {
-        const excess = distToCenter - commRadius * 0.95;
-        fx += ((targetCenterX - person.x) / distToCenter) * (excess * 2.5);
-        fy += ((targetCenterY - person.y) / distToCenter) * (excess * 2.5);
+      if (distToCenter > commRadius * 2.2) {
+        const excess = distToCenter - commRadius * 2.2;
+        fx += ((targetCenterX - person.x) / distToCenter) * (excess * 2.0);
+        fy += ((targetCenterY - person.y) / distToCenter) * (excess * 2.0);
       }
     }
   }

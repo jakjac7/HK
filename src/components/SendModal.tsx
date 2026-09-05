@@ -100,7 +100,7 @@ export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend })
               현재 파송 가능한 성숙한 은사 리더가 없습니다. 제자 훈련을 통해 먼저 리더를 세우세요.
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
               {qualifiedLeaders.map(leader => {
                 const info = leader.calling ? CALLING_DEFINITIONS[leader.calling] : null;
                 const isSelected = selectedLeaderId === leader.id;
@@ -126,6 +126,33 @@ export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend })
             </div>
           )}
         </div>
+
+        {/* Care Capacity Impact Preview (Section 44) */}
+        {selectedLeader && primaryComm && (
+          <div className="bg-white/5 border border-white/10 p-2.5 rounded-sm text-xs flex flex-col gap-1">
+            <span className="text-[10px] text-white/50 uppercase tracking-wider font-bold">
+              모교회 돌봄 수용력 영향 분석
+            </span>
+            <div className="flex items-center justify-between font-mono text-[11px]">
+              <span className="text-white/70">현재 수용력:</span>
+              <span className="text-white font-bold">{primaryComm.stats.careCapacity}명</span>
+            </div>
+            <div className="flex items-center justify-between font-mono text-[11px]">
+              <span className="text-white/70">파송 후 예상 수용력:</span>
+              <span className="text-amber-300 font-bold">
+                {Math.max(0, primaryComm.stats.careCapacity - (selectedLeader.calling === 'SHEPHERD' ? 4 : 1))}명
+                <span className="text-white/40 text-[10px] ml-1">
+                  ({selectedLeader.calling === 'SHEPHERD' ? '-4명 (목자 파송)' : '-1명 (제자 파송)'})
+                </span>
+              </span>
+            </div>
+            {primaryComm.stats.population - 1 > Math.max(0, primaryComm.stats.careCapacity - (selectedLeader.calling === 'SHEPHERD' ? 4 : 1)) && (
+              <p className="text-[10px] text-rose-300 font-semibold mt-0.5">
+                ⚠️ 파송 후 남은 성도에 비해 돌봄 수용력이 부족해져 돌봄 공백이 발생할 수 있습니다.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Step 2: Select Direction */}
         <div className="flex flex-col gap-1.5">

@@ -26,7 +26,9 @@ export type NeedType =
   | 'READY'
   | 'TENSION';
 
-export type DriftType = 'DECEPTION' | 'DIVISION' | 'BURNOUT';
+export type DriftType = 'DECEPTION' | 'DIVISION' | 'BURNOUT' | 'APATHY';
+
+export type CareStatus = 'NONE' | 'CARED' | 'UNCARED';
 
 export type CommunityPriority = 'GO' | 'ROOT' | 'CARE';
 
@@ -61,14 +63,27 @@ export interface Person {
   targetX: number | null;
   targetY: number | null;
   
-  // Psychological & Spiritual stats
-  trust: number;       // 0-100
-  depth: number;       // 0-100 (WORD -> visual color intensity)
-  stability: number;   // 0-100 (CARE -> staying power)
-  readiness: number;   // 0-100 (For Train / Discipleship / Calling)
-  autonomy: number;    // 0-100 (Autonomous action capacity)
-  burnout: number;     // 0-100 (Stagnates if high)
+  // Psychological & Spiritual stats (1~100 internally, 1~10 step scale for player)
+  trust: number;       // 0-100 (지체 간 신뢰)
+  depth: number;       // 0-100 (복음의 농도 / 깊이)
+  stability: number;   // 0-100 (사랑의 정착)
+  readiness: number;   // 0-100 (사역 헌신도)
+  autonomy: number;    // 0-100 (자립 생명력)
+  burnout: number;     // 0-100 (영적 지침 / 소진)
   
+  // Care System (Section 16-22)
+  careStatus: CareStatus;
+  caregiverId?: string;
+  careTargets?: string[];   // For Shepherds (up to 4) & Mature disciples (1)
+  careCapacity?: number;    // 4 for Shepherd, 1 for Mature disciple
+  careLoad?: number;        // careTargets.length
+  leaveIntent?: number;     // 0-100 (rises if UNCARED)
+
+  // Real Lineage (Section 41-42)
+  trainedById?: string;
+  parentLeaderId?: string;
+  isMatureDisciple?: boolean;
+
   need: PersonNeed | null;
   
   // External person tracking
@@ -82,6 +97,13 @@ export interface Person {
     targetCommunitySeedX: number;
     targetCommunitySeedY: number;
     progress: number;
+    followers?: string[];
+  };
+  
+  // Visual Feedback for Skills
+  visualEffect?: {
+    type: ActionId;
+    timer: number;
   };
   
   // Contribution stats for run story
@@ -98,6 +120,7 @@ export interface Person {
   // Visual animation props
   wobbleOffset: number;
   lastWorshipPulse?: number;
+  revealGlowTimer?: number; // for calling discovery animation
 }
 
 export interface CommunityStats {
@@ -113,16 +136,25 @@ export interface CommunityStats {
   centralization: number; // 0-100 (High = single leader dependence)
   integrity: number;   // 0-100 (Truth vs deception)
   safeCapacity: number;// PRAYER / Intercessors expand this
+  
+  // Shepherd Care Capacity (Section 16-22)
+  careCapacity: number; // (Mature Disciples * 1) + (Shepherds * 4)
+  careDemand: number;   // Current community members needing care
+  uncaredCount: number; // Members with careStatus === 'UNCARED'
+  shepherdCount: number;
+  careGap?: number;
+  overloadBurnout?: number;
 }
 
 export interface CommunityDrift {
   type: DriftType;
-  intensity: number;   // 0-100
+  intensity: number;   // 0-100 (Doesn't auto-expire, multi-action mitigation)
   discovered: boolean; // Teacher reveals Deception
   duration: number;
   title: string;
   description: string;
   sourcePersonId?: string;
+  vulnerabilitySource?: string;
 }
 
 export interface Community {
@@ -143,6 +175,133 @@ export interface Community {
   currentRadius: number;
 }
 
+export type ActionId = 'FELLOWSHIP' | 'WORD' | 'PRAYER' | 'WORSHIP' | 'CARE' | 'SEND';
+
+export interface PlayerAction {
+  id: ActionId;
+  koreanName: string;
+  subtitle: string;
+  description: string;
+  cooldown: number;        // total cooldown in seconds (data-driven)
+  currentCooldown: number; // remaining cooldown (0 = READY)
+  attentionCost: number;   // 1 or 2
+  icon: string;
+  targetType: 'PERSON' | 'ANY' | 'STRATEGIC';
+}
+
+// Map System Types (Section 25-35)
+export type MapId = 'COUNTRYSIDE' | 'CAMPUS' | 'DOWNTOWN';
+
+export interface MapZone {
+  id: string;
+  name: string;
+  englishName: string;
+  relX: number; // 0..1 fraction of canvas
+  relY: number; // 0..1 fraction of canvas
+  relRadius: number; // 0..1 fraction of min(w, h)
+  influence: {
+    speedMultiplier: number;
+    questionNeedMultiplier: number;
+    careMultiplier: number;
+    relationshipMultiplier: number;
+  };
+}
+
+export interface MapProfile {
+  id: MapId;
+  name: string;
+  koreanName: string;
+  subtitle: string;
+  description: string;
+  populationIndicator: string; // e.g. "●●○○○"
+  mobilityIndicator: string;   // e.g. "●○○○○"
+  crisisSummary: string;       // e.g. "침체 · 폐쇄성"
+  
+  populationDensity: number;
+  populationSpawnRate: number;
+  mobility: number;
+  averageStayTime: number;
+  openness: number;
+  
+  ageProfile: {
+    young: number;
+    adult: number;
+    senior: number;
+  };
+  
+  driftWeights: {
+    deception: number;
+    division: number;
+    burnout: number;
+    apathy: number;
+  };
+
+  zones: MapZone[];
+}
+
+export type SuccessionStatus = 'LOW' | 'FAIR' | 'READY';
+
+export interface ReleaseSnapshot {
+  time: number;
+  population: number;
+  health: number;
+  integrity: number;
+  communityCount: number;
+  careCapacity: number;
+  careGap: number;
+  g1Count: number;
+  g2Count: number;
+  g3Count: number;
+}
+
+export interface RunStats {
+  timeElapsed: number; // seconds (0 to 570)
+  isReleaseActive: boolean; // 540-570s (09:00-09:30)
+  isGameOver: boolean;
+  mapId: MapId;
+  
+  // Metrics
+  peopleReached: number;
+  newcomerCount: number;
+  leadersTrained: number;
+  g1Count: number;
+  g2Count: number;
+  g3Count: number;
+  deceptionsExposed: number;
+  crisesOvercome: number;
+  communitiesFormed: number;
+  
+  // Release Evaluation
+  releaseSnapshot?: ReleaseSnapshot;
+  autonomousCareCount: number;
+  autonomousReachCount: number;
+  autonomousFormationCount: number;
+  autonomousCrisesResolved: number;
+  releaseSurvivalRate: number;
+  
+  // Final Score Breakdown
+  autonomyScore: number;
+  multiplicationScore: number;
+  kingdomHealthScore: number;
+  gospelIntegrityScore: number;
+  reachScore: number;
+  finalScore: number;
+  finalGrade: 'S' | 'A' | 'B' | 'C' | 'D';
+  
+  // Story Narrative & 3 Core Causal Reflections
+  runStory: string[];
+  struggles: string[];
+  reflections: string[]; // Max 3 concise causal reflections
+}
+
+export interface StoryEvent {
+  id: string;
+  timestamp: number;
+  text: string;
+  type: 'BLESSING' | 'SEND' | 'DRIFT' | 'WARNING' | 'FRUIT' | 'RELEASE';
+}
+
+// Legacy PracticeCard type kept for backwards compatibility if needed
 export type CardType =
   | 'MEAL'
   | 'WORD'
@@ -156,47 +315,8 @@ export interface PracticeCard {
   type: CardType;
   name: string;
   koreanName: string;
-  cost: number; // Attention cost: 1 or 2
+  cost: number;
   description: string;
   targetType: 'PERSON' | 'ANY' | 'TENSION' | 'READY';
   icon: string;
-}
-
-export type SuccessionStatus = 'LOW' | 'FAIR' | 'READY';
-
-export interface RunStats {
-  timeElapsed: number; // seconds (0 to 570)
-  isReleaseActive: boolean; // 540-570s (09:00-09:30)
-  isGameOver: boolean;
-  
-  // Metrics
-  peopleReached: number;
-  newcomerCount: number;
-  leadersTrained: number;
-  g1Count: number;
-  g2Count: number;
-  g3Count: number;
-  deceptionsExposed: number;
-  crisesOvercome: number;
-  communitiesFormed: number;
-  
-  // Final Score Breakdown
-  autonomyScore: number;
-  multiplicationScore: number;
-  kingdomHealthScore: number;
-  gospelIntegrityScore: number;
-  reachScore: number;
-  finalScore: number;
-  finalGrade: 'S' | 'A' | 'B' | 'C' | 'D';
-  
-  // Story Narrative
-  runStory: string[];
-  struggles: string[];
-}
-
-export interface StoryEvent {
-  id: string;
-  timestamp: number;
-  text: string;
-  type: 'BLESSING' | 'SEND' | 'DRIFT' | 'WARNING' | 'FRUIT' | 'RELEASE';
 }

@@ -157,37 +157,109 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
           </div>
         </div>
 
-        {/* Struggles / Spiritual Reflection */}
+        {/* Struggles / Spiritual Reflection (Max 3 causal sentences) */}
         {stats.struggles.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-serif font-bold text-rose-300 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-              영적 성찰과 교훈
+              핵심 사역 인과 성찰 (원인과 열매)
             </span>
-            <div className="bg-rose-500/10 p-3 rounded-sm border border-rose-500/30 text-xs text-rose-200/90 flex flex-col gap-1 leading-relaxed font-sans">
-              {stats.struggles.map((item, idx) => (
+            <div className="bg-rose-500/10 p-3 rounded-sm border border-rose-500/30 text-xs text-rose-200/90 flex flex-col gap-1.5 leading-relaxed font-sans">
+              {stats.struggles.slice(0, 3).map((item, idx) => (
                 <p key={idx}>· {item}</p>
               ))}
             </div>
           </div>
         )}
 
-        {/* Buttons */}
-        <div className="flex items-center gap-2 pt-2">
-          <button
-            onClick={onRestart}
-            className="flex-1 py-3 px-4 rounded-sm font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_20px_rgba(251,191,36,0.25)] flex items-center justify-center gap-2 transition-all font-mono uppercase tracking-wider cursor-pointer"
-          >
-            <RefreshCw className="w-4 h-4" />
-            새로운 사역 시작하기
-          </button>
-          <button
-            onClick={onContinueWatching}
-            className="py-3 px-4 rounded-sm font-semibold text-xs bg-white/5 hover:bg-white/10 text-white/70 border border-white/10 flex items-center justify-center gap-1.5 transition-all font-mono cursor-pointer"
-          >
-            <Eye className="w-4 h-4" />
-            관찰 계속하기
-          </button>
+        {/* Export & Actions Row */}
+        <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onRestart}
+              className="flex-1 py-2.5 px-4 rounded-sm font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_20px_rgba(251,191,36,0.25)] flex items-center justify-center gap-2 transition-all font-mono uppercase tracking-wider cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              새로운 사역 시작하기
+            </button>
+            <button
+              onClick={onContinueWatching}
+              className="py-2.5 px-4 rounded-sm font-semibold text-xs bg-white/5 hover:bg-white/10 text-white/70 border border-white/10 flex items-center justify-center gap-1.5 transition-all font-mono cursor-pointer"
+            >
+              <Eye className="w-4 h-4" />
+              관찰 계속하기
+            </button>
+          </div>
+
+          {/* Research Data Export (CSV / JSON) */}
+          <div className="flex items-center justify-end gap-2 text-[10px] font-mono text-white/50 pt-1">
+            <span>사역 데이터 내보내기:</span>
+            <button
+              onClick={() => {
+                const data = {
+                  finalGrade: stats.finalGrade,
+                  finalScore: stats.finalScore,
+                  stepScale: {
+                    total: toStep10(stats.finalScore),
+                    autonomy: toStep10(stats.autonomyScore),
+                    multiplication: toStep10(stats.multiplicationScore),
+                    health: toStep10(stats.kingdomHealthScore),
+                    word: toStep10(stats.gospelIntegrityScore),
+                    reach: toStep10(stats.reachScore),
+                  },
+                  scores: {
+                    autonomy: stats.autonomyScore,
+                    multiplication: stats.multiplicationScore,
+                    kingdomHealth: stats.kingdomHealthScore,
+                    gospelIntegrity: stats.gospelIntegrityScore,
+                    reach: stats.reachScore,
+                  },
+                  counts: {
+                    peopleReached: stats.peopleReached,
+                    communitiesFormed: stats.communitiesFormed,
+                    leadersTrained: stats.leadersTrained,
+                    crisesOvercome: stats.crisesOvercome,
+                  },
+                  runStory: stats.runStory,
+                  struggles: stats.struggles,
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `his-kingdom-report-${Date.now()}.json`;
+                a.click();
+              }}
+              className="px-2 py-0.5 rounded-xs bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 cursor-pointer"
+            >
+              JSON 다운로드
+            </button>
+            <button
+              onClick={() => {
+                const headers = 'Metric,RawScore,StepScale_1_to_10\n';
+                const rows = [
+                  `FinalScore,${stats.finalScore},${toStep10(stats.finalScore)}`,
+                  `AutonomyScore,${stats.autonomyScore},${toStep10(stats.autonomyScore)}`,
+                  `MultiplicationScore,${stats.multiplicationScore},${toStep10(stats.multiplicationScore)}`,
+                  `KingdomHealthScore,${stats.kingdomHealthScore},${toStep10(stats.kingdomHealthScore)}`,
+                  `GospelIntegrityScore,${stats.gospelIntegrityScore},${toStep10(stats.gospelIntegrityScore)}`,
+                  `ReachScore,${stats.reachScore},${toStep10(stats.reachScore)}`,
+                  `PeopleReached,${stats.peopleReached},${stats.peopleReached}`,
+                  `CommunitiesFormed,${stats.communitiesFormed},${stats.communitiesFormed}`,
+                  `LeadersTrained,${stats.leadersTrained},${stats.leadersTrained}`,
+                ].join('\n');
+                const blob = new Blob([headers + rows], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `his-kingdom-report-${Date.now()}.csv`;
+                a.click();
+              }}
+              className="px-2 py-0.5 rounded-xs bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 cursor-pointer"
+            >
+              CSV 다운로드
+            </button>
+          </div>
         </div>
       </div>
     </div>

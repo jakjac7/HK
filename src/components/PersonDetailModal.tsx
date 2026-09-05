@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Person, CallingType } from '../types';
 import { CALLING_DEFINITIONS } from '../data/callings';
 import {
@@ -13,22 +13,18 @@ import {
   getNeedDetails,
   FAITH_STATS,
 } from '../utils/faithTerms';
-import { X, Sparkles, BookOpen, Heart, Flame, Shield, User, Award } from 'lucide-react';
+import { X, Sparkles, BookOpen, Heart, Flame, Shield, User, Award, Edit2 } from 'lucide-react';
 
 interface PersonDetailModalProps {
   person: Person | null;
   onClose: () => void;
-  onAssignCalling: (personId: string, calling: CallingType) => void;
-  canAffordTrain: boolean;
-  onTrainPerson: (personId: string) => void;
+  onDiscoverCalling?: (personId: string) => void;
 }
 
 export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
   person,
   onClose,
-  onAssignCalling,
-  canAffordTrain,
-  onTrainPerson,
+  onDiscoverCalling,
 }) => {
   if (!person) return null;
 
@@ -85,6 +81,24 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
                   ? '외부 구도자 (새가족 인도 대상)'
                   : '공동체 지체 (말씀 양육 진행 중)'}
               </p>
+              {!person.isExternal && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-xs font-mono font-semibold ${
+                    person.careStatus === 'CARED'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : person.careStatus === 'UNCARED'
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                      : 'bg-white/10 text-white/50'
+                  }`}>
+                    {person.careStatus === 'CARED' ? '✓ 돌봄 받는 중' : person.careStatus === 'UNCARED' ? '! 돌봄 절실 (미돌봄)' : '돌봄 대기'}
+                  </span>
+                  {person.calling === 'SHEPHERD' && (
+                    <span className="text-[10px] text-amber-300 font-mono">
+                      담당 돌봄: {person.careLoad || 0} / 4명
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -243,43 +257,28 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
           </div>
         )}
 
-        {/* Calling Assignment Section */}
+        {/* Calling & Discipleship Status */}
         {!person.isExternal && (
           <div className="bg-white/5 border border-white/10 rounded-sm p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-serif font-bold text-[#F5F5F5] tracking-wide">
-                은사 안수 및 제자 세움
+                은사 및 사역 현황
               </span>
-              {canAffordTrain && (
+              {(!person.calling || person.calling === 'WORSHIPPER' || person.calling === 'INTERCESSOR') && onDiscoverCalling && (
                 <button
-                  onClick={() => onTrainPerson(person.id)}
-                  className="flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 bg-amber-400/20 text-amber-200 border border-amber-400/40 rounded-sm hover:bg-amber-400/30 cursor-pointer"
+                  onClick={() => onDiscoverCalling(person.id)}
+                  className="flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 px-2 py-1 rounded-sm transition-colors border border-amber-500/30"
                 >
                   <Sparkles className="w-3 h-3" />
-                  제자 훈련 (시선 2 ●)
+                  은사 발견 및 사역 배치
                 </button>
               )}
             </div>
 
             {!person.calling ? (
-              <div className="grid grid-cols-5 gap-1.5 pt-1">
-                {(['EVANGELIST', 'SHEPHERD', 'TEACHER', 'INTERCESSOR', 'WORSHIPPER'] as CallingType[]).map(c => {
-                  const info = CALLING_DEFINITIONS[c!];
-                  return (
-                    <button
-                      key={c}
-                      onClick={() => onAssignCalling(person.id, c)}
-                      className="flex flex-col items-center p-2 rounded-sm bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-400/40 transition-all cursor-pointer"
-                      title={`${info.koreanName}: ${info.description}`}
-                    >
-                      <span className="text-base">{info.symbol}</span>
-                      <span className="text-[10px] text-white/80 mt-1 font-medium truncate w-full text-center">
-                        {info.koreanName}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <p className="text-[11px] text-white/50 font-sans">
+                아직 직분이 없습니다. 말씀과 양육(행동카드)을 통해 훈련을 받으면 중보자, 예배자로 세워질 수 있습니다.
+              </p>
             ) : (
               <p className="text-[11px] text-white/50 font-sans">
                 {callingInfo?.koreanName}의 부르심을 받아 충성되이 그리스도의 몸을 세워가고 있습니다.
