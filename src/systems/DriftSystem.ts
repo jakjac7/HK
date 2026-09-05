@@ -19,69 +19,69 @@ export const SOCIETAL_NEWS_DATABASE: Record<
 > = {
   DECEPTION: [
     {
-      headline: '[사회 속보] 캠퍼스 및 도심가에 신천지 등 사이비 이단 포교 활동 급증… 청년 대학가 경계령',
-      impactDescription: '거짓 가르침과 왜곡된 교리가 침투하고 있습니다. 교사의 말씀 양육(ROOT)과 복음 선포가 시급합니다.',
+      headline: '[사상 풍조] 자극적인 거짓 가르침과 혼란스러운 교리 확산… 성도 분별력 경보',
+      impactDescription: '순전한 복음의 기초가 약화된 틈을 타 왜곡된 사상이 공동체를 위협합니다. 교사의 말씀 양육(ROOT)이 시급합니다.',
       category: 'CULT',
     },
     {
-      headline: '[교계 긴급 뉴스] 유튜브·SNS 발 왜곡된 종말론과 가짜 성경 해석 확산… 청년 성도 혼란 가중',
-      impactDescription: '성도들의 복음적 분별력이 흔들리고 있습니다. 진리의 말씀 선포로 기준을 바로 세워야 합니다.',
+      headline: '[미디어 징후] SNS발 왜곡된 종말론과 자의적 성경 해석 범람… 영적 혼란 가중',
+      impactDescription: '성도들의 복음적 분별력이 흔들리고 있습니다. 생명의 말씀 선포로 진리의 기준을 바로 세워야 합니다.',
       category: 'CULT',
     },
     {
-      headline: '[심층 보도] 정통 교리를 흔드는 기복주의 침투… 거짓 가르침의 유혹 확산 조짐',
-      impactDescription: '순전한 복음의 깊이가 얕아진 틈을 타 왜곡된 사상이 공동체를 위협합니다.',
+      headline: '[시대 경보] 기복주의와 세속적 가치관의 유혹 확산 조짐… 신앙의 본질 시험대',
+      impactDescription: '복음의 깊이가 얕아질수록 왜곡된 가르침에 쉽게 노출됩니다. 기초를 굳건히 다져야 합니다.',
       category: 'CULT',
     },
   ],
   BURNOUT: [
     {
-      headline: '[경제 속보] 청년 실업률 역대 최고치 경신 및 고물가 한파… 2030 성도 생계 불안과 탈진 심화',
-      impactDescription: '취업난과 생계 부담으로 사역자들과 성도들의 피로가 누적되고 있습니다. 쉼과 치유의 심방(CARE)이 절실합니다.',
+      headline: '[경제 환경] 지속되는 고물가와 극심한 생계 압박… 지체들의 만성 피로와 탈진 심화',
+      impactDescription: '과도한 업무와 경제적 부담으로 피로가 누적되고 있습니다. 쉼과 치유의 심방(CARE)이 절실합니다.',
       category: 'ECONOMY',
     },
     {
-      headline: '[사회 기획] 2030 세대 "아무것도 할 힘이 없다"… 만성 피로와 영적 무기력 증후군 만연',
+      headline: '[사회 피로] 성과 경쟁과 휴식의 부재… "더 이상 버틸 힘이 없다" 번아웃 증후군 확산',
       impactDescription: '지친 심령들이 기도의 손을 놓고 있습니다. 중보기도(PRAYER)와 목자의 따뜻한 위로가 필요합니다.',
       category: 'ECONOMY',
     },
     {
-      headline: '[산업 리포트] 대규모 구조조정과 야근의 일상화… 평신도 봉사자들의 영적 에너지 고갈 호소',
-      impactDescription: '과도한 사역과 세상의 압박으로 번아웃 위기가 고조되고 있습니다.',
+      headline: '[사역 경보] 지속된 돌봄 부담 누적으로 일꾼들의 영적 에너지 급격히 고갈',
+      impactDescription: '사역의 짐을 함께 나누고 은혜의 보좌 앞으로 나아가 새 힘을 얻어야 합니다.',
       category: 'ECONOMY',
     },
   ],
   DIVISION: [
     {
-      headline: '[사회 뉴스] 총선 정국 극단적 정치 대립과 이념 갈등 심화… 교회 공동체로 번지는 편가르기',
-      impactDescription: '정치적 견해 차이와 세대 간의 불통으로 성도 간의 신뢰가 금이 가고 있습니다. 식탁의 교제(FELLOWSHIP)가 절실합니다.',
+      headline: '[사회 갈등] 사회적 편가르기와 불신 풍조의 여파… 공동체 내부로 번지는 관계 균열',
+      impactDescription: '불통과 오해로 성도 간의 신뢰에 금이 가고 있습니다. 따뜻한 식탁의 교제(FELLOWSHIP)가 절실합니다.',
       category: 'POLITICS',
     },
     {
-      headline: '[긴급 속보] 온라인 커뮤니티發 혐오 담론 범람… "우리와 그들"로 갈라지는 공동체 균열 조짐',
-      impactDescription: '돌봄의 공백과 오해가 깊은 감정의 골로 번지고 있습니다. 사랑의 결속과 화평이 필요합니다.',
+      headline: '[관계 경보] 소외감과 미해결된 긴장이 쌓이며 지체들 사이에 보이지 않는 벽 형성',
+      impactDescription: '돌봄의 공백과 마음의 상처를 방치하면 분열의 골이 깊어집니다. 사랑의 결속이 필요합니다.',
       category: 'POLITICS',
     },
     {
-      headline: '[교계 시평] 세대 간 문화적 단절과 의사소통 부재… 청년층과 기성세대 간의 거리감 확대',
-      impactDescription: '소외된 지체들의 아픔을 품지 못하면 분열의 균열이 걷잡을 수 없이 커집니다.',
+      headline: '[소통 부재] 세대 간 시선의 차이와 대화 단절… 하나 됨의 위기 직면',
+      impactDescription: '소외된 지체들의 아픔을 품지 못하면 화평이 깨어집니다. 그리스도 안에서 한 몸 됨을 회복해야 합니다.',
       category: 'POLITICS',
     },
   ],
   APATHY: [
     {
-      headline: '[문화 리포트] 초개인주의와 숏폼 도파민 중독… 영혼을 향한 애통함이 실종된 도시의 그늘',
-      impactDescription: '세속적 안락함에 젖어 외부 영혼들을 향한 전도의 열정이 식어가고 있습니다. 예배(WORSHIP)의 감격을 회복해야 합니다.',
+      headline: '[세속 풍조] 안락함에 안주하는 개인주의 만연… 이웃을 향한 관심과 복음의 열정 식어감',
+      impactDescription: '영혼을 향한 애통함을 잃어버리고 있습니다. 온전한 예배(WORSHIP)로 가슴을 뜨겁게 달구어야 합니다.',
       category: 'SECULARISM',
     },
     {
-      headline: '[사회 속보] 종교적 무관심 시대 도래… 2030 세대의 영적 냉담 현상 심각한 수준',
-      impactDescription: '교회 문턱을 넘는 발걸음이 줄어들고 영적 정체가 시작되고 있습니다. 선교적 시선(GO)이 요구됩니다.',
+      headline: '[영적 냉담] 분주한 일상 속에 영적 무관심과 침체가 공동체 전반으로 침투',
+      impactDescription: '교제에 활력이 사라지고 성장이 멈추어 가고 있습니다. 선교적 시선(GO)으로 지경을 넓혀야 합니다.',
       category: 'SECULARISM',
     },
     {
-      headline: '[특집] "나 혼자만 평안하면 그만"… 영적 나르시시즘과 선교적 야성의 실종 경고',
-      impactDescription: '복음 전파의 열정을 잃어버린 공동체에 차가운 침체의 먹구름이 끼고 있습니다.',
+      headline: '[정체 경보] "우리끼리만 평안하면 그만"… 영적 안일함과 선교적 야성의 실종 경고',
+      impactDescription: '세상으로 나아가는 생명력을 잃으면 물이 고여 썩게 됩니다. 복음의 야성을 깨워야 합니다.',
       category: 'SECULARISM',
     },
   ],
@@ -173,6 +173,7 @@ export class DriftSystem {
           type: 'DECEPTION',
           intensity: 28, // Milder starting intensity
           discovered: false,
+          detectionProgress: 0,
           duration: 0,
           title: '혼란 (거짓 가르침)',
           description: '말씀의 왜곡으로 인해 지체들의 심령이 흔들리고 의심이 싹트고 있습니다.',
@@ -251,15 +252,36 @@ export class DriftSystem {
         escalationRate = 0.35;
       }
 
-      // Intercessors and Teachers autonomously slow down drift
-      const hasTeacher = communityMembers.some(p => p.calling === 'TEACHER');
+      // Intercessors, Teachers, and Worshippers autonomously slow down and resolve drift
+      const teachers = communityMembers.filter(p => p.calling === 'TEACHER');
       const hasIntercessor = communityMembers.some(p => p.calling === 'INTERCESSOR');
       const hasWorshipper = communityMembers.some(p => p.calling === 'WORSHIPPER');
 
-      if (drift.type === 'DECEPTION' && hasTeacher) {
-        drift.discovered = true;
-        escalationRate -= 0.35;
+      // TASK HK4-120: Teacher Progressive Deception Detection
+      if (drift.type === 'DECEPTION') {
+        if (!drift.discovered) {
+          if (teachers.length > 0) {
+            let bestDetectionRate = 0;
+            for (const t of teachers) {
+              const dist = Math.hypot(t.x - community.centerX, t.y - community.centerY);
+              const proxBonus = dist < community.currentRadius ? 1.4 : 1.0;
+              const depthBonus = Math.max(0.5, t.depth / 50);
+              const rootBonus = community.priority === 'ROOT' ? 1.35 : 1.0;
+              const rate = 14 * depthBonus * proxBonus * rootBonus;
+              if (rate > bestDetectionRate) bestDetectionRate = rate;
+            }
+            drift.detectionProgress = Math.min(100, (drift.detectionProgress || 0) + bestDetectionRate * dt);
+            if (drift.detectionProgress >= 100) {
+              drift.discovered = true;
+              drift.title = '거짓 가르침 분별됨 (말씀의 분별 완료)';
+            }
+          }
+        }
+        if (drift.discovered) {
+          escalationRate -= 0.45;
+        }
       }
+
       if (drift.type === 'BURNOUT' && hasIntercessor) {
         escalationRate -= 0.4;
       }

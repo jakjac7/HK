@@ -16,6 +16,7 @@ import { ResultScreen } from './components/ResultScreen';
 import { TutorialGuideModal } from './components/TutorialGuideModal';
 import { TitleScreen } from './components/TitleScreen';
 import { SocietalNewsTicker } from './components/SocietalNewsTicker';
+import { WordSeedToast } from './components/WordSeedToast';
 import { Person, CallingType, ActionId, MapId } from './types';
 
 export default function App() {
@@ -36,6 +37,29 @@ export default function App() {
   const [isSendModalOpen, setIsSendModalOpen] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [dismissResultScreen, setDismissResultScreen] = useState<boolean>(false);
+  const [isWordToastVisible, setIsWordToastVisible] = useState<boolean>(false);
+  const wordToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Trigger graceful toast notification when Word is proclaimed
+  const triggerWordToast = useCallback(() => {
+    if (wordToastTimerRef.current) {
+      clearTimeout(wordToastTimerRef.current);
+    }
+    setIsWordToastVisible(true);
+    wordToastTimerRef.current = setTimeout(() => {
+      setIsWordToastVisible(false);
+    }, 2800);
+  }, []);
+
+  useEffect(() => {
+    engine.onWordProclaimed = triggerWordToast;
+    return () => {
+      engine.onWordProclaimed = undefined;
+      if (wordToastTimerRef.current) {
+        clearTimeout(wordToastTimerRef.current);
+      }
+    };
+  }, [engine, triggerWordToast]);
 
   // Sync state for UI counters (5 times a second is smooth and CPU-friendly)
   useEffect(() => {
@@ -56,8 +80,7 @@ export default function App() {
   }, [engine, selectedPerson, hasStarted]);
 
   const handleStartGame = useCallback((mapId: MapId) => {
-    engine.setMap(mapId);
-    engine.reset(true);
+    engine.reset(true, mapId);
     setHasStarted(true);
   }, [engine]);
 
@@ -128,8 +151,8 @@ export default function App() {
 
   // Handle SEND confirmation
   const handleSendLeader = useCallback(
-    (leaderId: string, direction: 'NORTH' | 'EAST' | 'SOUTH' | 'WEST') => {
-      engine.sendLeader(leaderId, direction);
+    (leaderId: string, directionOrZone: string, coords?: { x: number; y: number }) => {
+      engine.sendLeader(leaderId, directionOrZone, coords);
     },
     [engine]
   );
@@ -166,7 +189,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden flex flex-col bg-slate-950 select-none">
+    <div className="fixed inset-0 w-full h-[100dvh] overflow-hidden flex flex-col bg-slate-950 select-none">
       {/* Top HUD */}
       <TopHUD
         engine={engine}
@@ -175,6 +198,9 @@ export default function App() {
         isMuted={isMuted}
         setIsMuted={setIsMuted}
       />
+
+      {/* Word of Life Seed Toast Notification */}
+      <WordSeedToast visible={isWordToastVisible} />
 
       {/* Societal News Ticker (시대의 징후 뉴스 예고 및 경보) */}
       <SocietalNewsTicker
@@ -202,6 +228,54 @@ export default function App() {
           onApplyActionOnPerson={handleApplyActionOnPerson}
         />
 
+        {/* Selected Person Floating Quick UI (anchored to canvas area above bottom bar) */}
+        {selectedPerson && !showPersonDetail && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 bg-[#121212]/95 backdrop-blur-md border border-white/20 p-3 rounded-lg shadow-2xl flex flex-col items-center gap-2 pointer-events-auto w-64 max-w-[92vw] animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex justify-between w-full items-center mb-1">
+              <span className="font-bold text-[#F5F5F5]">{selectedPerson.name}</span>
+              <button onClick={() => setSelectedPerson(null)} className="text-white/40 hover:text-white/80 cursor-pointer"><span className="text-xs">✕</span></button>
+            </div>
+            
+            <div className="w-full flex flex-col gap-1.5 text-[10px] font-sans">
+              <div className="flex justify-between items-center text-violet-300">
+                <span>성령충만</span>
+                <div className="flex-1 ml-2 bg-white/10 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-violet-400 h-full" style={{ width: `${Math.min(100, Math.max(0, selectedPerson.autonomy))}%` }} />
+                </div>
+              </div>
+              <div className="flex justify-between items-center text-rose-300">
+                <span>피로도</span>
+                <div className="flex-1 ml-2 bg-white/10 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-rose-400 h-full" style={{ width: `${Math.min(100, Math.max(0, selectedPerson.burnout))}%` }} />
+                </div>
+              </div>
+            </div>
+            
+            <div className="w-full grid grid-cols-2 gap-2 mt-1">
+              <button 
+                onClick={() => handleSelectAction('CARE')} 
+                className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 py-1.5 rounded-sm text-xs transition-colors cursor-pointer"
+              >
+                심방하기
+              </button>
+              <button 
+                onClick={() => setShowPersonDetail(true)}
+                className="bg-white/10 text-white/80 hover:bg-white/20 border border-white/10 py-1.5 rounded-sm text-xs transition-colors cursor-pointer"
+              >
+                상세보기
+              </button>
+            </div>
+            {(!selectedPerson.calling && !selectedPerson.isExternal) && (
+              <button 
+                onClick={() => handleDiscoverCalling(selectedPerson.id)}
+                className="w-full bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 py-1.5 rounded-sm text-xs transition-colors mt-1 cursor-pointer"
+              >
+                은사 발견 (사역 시작)
+              </button>
+            )}
+          </div>
+        )}
+
         {/* The Release Cinematic Overlay */}
         <ReleaseOverlay engine={engine} />
       </main>
@@ -213,54 +287,6 @@ export default function App() {
         onSelectAction={handleSelectAction}
         onOpenSendModal={() => setIsSendModalOpen(true)}
       />
-
-      {/* Selected Person Floating Quick UI */}
-      {selectedPerson && !showPersonDetail && (
-        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-40 bg-[#121212] border border-white/20 p-3 rounded-lg shadow-2xl flex flex-col items-center gap-2 pointer-events-auto w-64 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex justify-between w-full items-center mb-1">
-            <span className="font-bold text-[#F5F5F5]">{selectedPerson.name}</span>
-            <button onClick={() => setSelectedPerson(null)} className="text-white/40 hover:text-white/80"><span className="text-xs">✕</span></button>
-          </div>
-          
-          <div className="w-full flex flex-col gap-1.5 text-[10px] font-sans">
-            <div className="flex justify-between items-center text-violet-300">
-              <span>성령충만</span>
-              <div className="flex-1 ml-2 bg-white/10 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-violet-400 h-full" style={{ width: `${Math.min(100, Math.max(0, selectedPerson.autonomy))}%` }} />
-              </div>
-            </div>
-            <div className="flex justify-between items-center text-rose-300">
-              <span>피로도</span>
-              <div className="flex-1 ml-2 bg-white/10 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-rose-400 h-full" style={{ width: `${Math.min(100, Math.max(0, selectedPerson.burnout))}%` }} />
-              </div>
-            </div>
-          </div>
-          
-          <div className="w-full grid grid-cols-2 gap-2 mt-1">
-            <button 
-              onClick={() => handleSelectAction('CARE')} 
-              className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 py-1.5 rounded-sm text-xs transition-colors"
-            >
-              심방하기
-            </button>
-            <button 
-              onClick={() => setShowPersonDetail(true)}
-              className="bg-white/10 text-white/80 hover:bg-white/20 border border-white/10 py-1.5 rounded-sm text-xs transition-colors"
-            >
-              상세보기
-            </button>
-          </div>
-          {(!selectedPerson.calling && !selectedPerson.isExternal) && (
-            <button 
-              onClick={() => handleDiscoverCalling(selectedPerson.id)}
-              className="w-full bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 py-1.5 rounded-sm text-xs transition-colors mt-1"
-            >
-              은사 발견 (사역 시작)
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Person Detail & Discipleship Modal */}
       {selectedPerson && showPersonDetail && (

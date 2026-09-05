@@ -149,7 +149,7 @@ export const TopHUD: React.FC<TopHUDProps> = ({
                 <p className="font-bold text-amber-300">선교 환경: {currentMap.name}</p>
                 <p className="text-white/70 mt-0.5">{currentMap.description}</p>
                 <p className="text-amber-200/80 text-[10px] mt-0.5">
-                  새가족 유입 배율: {currentMap.newcomerRate}x
+                  새가족 유입 배율: {currentMap.populationSpawnRate}x
                 </p>
               </div>
             }

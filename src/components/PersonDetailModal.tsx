@@ -45,15 +45,15 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
     <div
       id="person-detail-modal-backdrop"
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
     >
       <div
         id="person-detail-modal"
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-md bg-[#121212] border border-white/15 rounded-t-lg sm:rounded-md p-5 shadow-2xl text-[#F5F5F5] flex flex-col gap-4 animate-in slide-in-from-bottom duration-200"
+        className="w-full max-w-md max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212] border border-white/15 rounded-t-lg sm:rounded-md shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
       >
-        {/* Header: Name, Gender, Generation (G0 = 개척멤버), Close */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        {/* Sticky Header: Name, Gender, Generation, Close */}
+        <div className="shrink-0 flex items-center justify-between border-b border-white/10 px-4 py-3 bg-[#161616]">
           <div className="flex items-center gap-3">
             <div
               className={`w-11 h-11 rounded-full flex items-center justify-center text-xl font-bold border border-white/20 bg-white/5 shadow-inner`}
@@ -109,6 +109,9 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-4 py-3.5 space-y-3.5 min-h-0 text-left">
 
         {/* Active Spiritual Need notice */}
         {person.need && needDetail && (
@@ -286,6 +289,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

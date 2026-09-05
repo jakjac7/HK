@@ -28,32 +28,34 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
   return (
     <div
       id="result-screen-backdrop"
-      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-hidden"
     >
       <div
         id="result-screen"
-        className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm sm:rounded-md p-6 shadow-2xl text-[#F5F5F5] flex flex-col gap-5 my-8 animate-in zoom-in-95 duration-300"
+        className="w-full max-w-lg max-h-[min(92vh,660px)] sm:max-h-[88vh] bg-[#121212] border border-white/15 rounded-md shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300"
       >
-        {/* Header with Grade Badge */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        {/* Sticky Header with Grade Badge */}
+        <div className="shrink-0 flex items-center justify-between border-b border-white/10 px-5 py-3.5 bg-[#161616]">
           <div>
             <span className="text-[10px] font-bold font-mono text-amber-400 tracking-widest uppercase">
               HIS KINGDOM · 사역 성찰 보고서
             </span>
-            <h2 className="text-xl font-serif font-extrabold mt-0.5 tracking-tight text-[#F5F5F5]">
+            <h2 className="text-lg sm:text-xl font-serif font-extrabold mt-0.5 tracking-tight text-[#F5F5F5]">
               공동체 사역 평가 보고서
             </h2>
           </div>
 
           <div
-            className={`w-14 h-14 rounded-sm bg-gradient-to-br ${gradeColors[stats.finalGrade]} border-2 shadow-lg flex items-center justify-center font-mono font-black text-2xl tracking-tighter`}
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-sm bg-gradient-to-br ${gradeColors[stats.finalGrade]} border-2 shadow-lg flex items-center justify-center font-mono font-black text-xl sm:text-2xl tracking-tighter shrink-0`}
           >
             {stats.finalGrade}
           </div>
         </div>
 
-        {/* Total Score & 5 Criteria Breakdown in 1~10 Scale */}
-        <div className="bg-white/5 border border-white/10 rounded-sm p-4 flex flex-col gap-3">
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0 text-left">
+          {/* Total Score & 5 Criteria Breakdown in 1~10 Scale */}
+          <div className="bg-white/5 border border-white/10 rounded-sm p-4 flex flex-col gap-3">
           <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
             <span className="text-xs font-serif font-semibold text-white/60">종합 사역 성숙도</span>
             <div className="flex items-baseline gap-2 font-mono">
@@ -171,28 +173,30 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
             </div>
           </div>
         )}
+        </div>
 
-        {/* Export & Actions Row */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+        {/* Sticky Export & Actions Footer */}
+        <div className="shrink-0 p-3.5 sm:p-4 border-t border-white/10 bg-[#161616] flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <button
+              id="btn-restart-simulation"
               onClick={onRestart}
-              className="flex-1 py-2.5 px-4 rounded-sm font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_20px_rgba(251,191,36,0.25)] flex items-center justify-center gap-2 transition-all font-mono uppercase tracking-wider cursor-pointer"
+              className="flex-1 py-2.5 px-4 rounded-sm font-bold text-xs sm:text-sm bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 shadow-[0_0_20px_rgba(251,191,36,0.3)] flex items-center justify-center gap-2 transition-all font-mono uppercase tracking-wider cursor-pointer"
             >
-              <RefreshCw className="w-4 h-4" />
-              새로운 사역 시작하기
+              <RefreshCw className="w-4 h-4 text-slate-950" />
+              <span>새로운 사역 시작하기</span>
             </button>
             <button
               onClick={onContinueWatching}
-              className="py-2.5 px-4 rounded-sm font-semibold text-xs bg-white/5 hover:bg-white/10 text-white/70 border border-white/10 flex items-center justify-center gap-1.5 transition-all font-mono cursor-pointer"
+              className="py-2.5 px-4 rounded-sm font-semibold text-xs bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 flex items-center justify-center gap-1.5 transition-all font-mono cursor-pointer"
             >
-              <Eye className="w-4 h-4" />
-              관찰 계속하기
+              <Eye className="w-4 h-4 text-white/70" />
+              <span>관찰 계속하기</span>
             </button>
           </div>
 
           {/* Research Data Export (CSV / JSON) */}
-          <div className="flex items-center justify-end gap-2 text-[10px] font-mono text-white/50 pt-1">
+          <div className="flex items-center justify-end gap-2 text-[10px] font-mono text-white/50">
             <span>사역 데이터 내보내기:</span>
             <button
               onClick={() => {

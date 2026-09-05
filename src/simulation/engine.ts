@@ -96,12 +96,17 @@ export class GameEngine {
   // Sub-systems
   public mapSystem: MapSystem;
   public actionSystem: ActionSystem;
-  private vulnerabilities: VulnerabilityAccumulator = {
-    confusion: 0,
-    division: 0,
-    burnout: 0,
-    apathy: 0,
-  };
+  public onWordProclaimed?: () => void;
+  private communityVulnerabilities: Map<string, VulnerabilityAccumulator> = new Map();
+
+  public getVulnerabilities(communityId: string): VulnerabilityAccumulator {
+    let vuln = this.communityVulnerabilities.get(communityId);
+    if (!vuln) {
+      vuln = { confusion: 0, division: 0, burnout: 0, apathy: 0 };
+      this.communityVulnerabilities.set(communityId, vuln);
+    }
+    return vuln;
+  }
 
   constructor(isKoreanTheme: boolean = true) {
     this.nameGen = new NameGenerator(isKoreanTheme);
@@ -161,20 +166,44 @@ export class GameEngine {
     this.logEvent(`선교 환경이 '${profile.name}'(으)로 변경되었습니다. (${profile.description})`, 'BLESSING');
   }
 
-  public reset(isKoreanTheme?: boolean) {
+  public reset(isKoreanTheme?: boolean, targetMapId?: MapId) {
     if (isKoreanTheme !== undefined) {
       this.nameGen.setTheme(isKoreanTheme);
     }
     this.nameGen.reset();
     this.hasInitialLayout = false;
     this.actionSystem = new ActionSystem();
-    this.vulnerabilities = { confusion: 0, division: 0, burnout: 0, apathy: 0 };
-    this.state = this.createInitialState();
+    this.communityVulnerabilities.clear();
+    const effectiveMapId = targetMapId || this.state?.mapId || 'CAMPUS';
+    this.mapSystem.setMap(effectiveMapId);
+    this.state = this.createInitialState(effectiveMapId);
   }
 
-  private createInitialState(): GameEngineState {
+  private createInitialState(targetMapId?: MapId): GameEngineState {
+    const effectiveMapId = targetMapId || (this.state && this.state.mapId) || this.mapSystem.getMapProfile().id || 'CAMPUS';
+    this.mapSystem.setMap(effectiveMapId);
+
     const cx = this.worldWidth / 2;
     const cy = this.worldHeight / 2;
+
+    // TASK HK4-031: Randomize Founding Callings (4 G0 Disciples, 2 Random Mature Workers)
+    const allCallingPool: CallingType[] = ['EVANGELIST', 'SHEPHERD', 'TEACHER', 'INTERCESSOR', 'WORSHIPPER'];
+    const shuffledPool = [...allCallingPool].sort(() => Math.random() - 0.5);
+    const workerCalling1 = shuffledPool[0];
+    const workerCalling2 = shuffledPool[1];
+
+    const callingsList: { calling: CallingType; nameGenGender: 'M' | 'F' }[] = [
+      { calling: workerCalling1, nameGenGender: 'M' },
+      { calling: workerCalling2, nameGenGender: 'F' },
+      { calling: null, nameGenGender: 'M' },
+      { calling: null, nameGenGender: 'F' },
+      { calling: null, nameGenGender: 'M' },
+      { calling: null, nameGenGender: 'F' },
+    ];
+
+    const shepherdCount = (workerCalling1 === 'SHEPHERD' ? 1 : 0) + (workerCalling2 === 'SHEPHERD' ? 1 : 0);
+    // Mature disciple = +1 careCapacity, Shepherd = +4 careCapacity
+    const foundingCareCapacity = Math.max(2, 2 * 1 + shepherdCount * 3);
 
     const initialCommunity: Community = {
       id: 'comm_1',
@@ -195,10 +224,10 @@ export class GameEngine {
         centralization: 20,
         integrity: 90,
         safeCapacity: 12,
-        careCapacity: 8,
+        careCapacity: foundingCareCapacity,
         careDemand: 6,
         uncaredCount: 0,
-        shepherdCount: 1,
+        shepherdCount,
         careGap: 0,
         overloadBurnout: 0,
       },
@@ -211,18 +240,6 @@ export class GameEngine {
       targetRadius: 105,
       currentRadius: 105,
     };
-
-    // Req 3: Initial community members should only be Intercessors, Worshippers, or null (disciples).
-    // The player will need to train them to get Shepherd/Teacher/Evangelist.
-    // (Note: This makes early game challenging as there's no Shepherd initially, they must use action to upgrade).
-    const callingsList: { calling: CallingType; nameGenGender: 'M' | 'F' }[] = [
-      { calling: 'INTERCESSOR', nameGenGender: 'M' },
-      { calling: 'WORSHIPPER', nameGenGender: 'F' },
-      { calling: 'INTERCESSOR', nameGenGender: 'M' },
-      { calling: 'WORSHIPPER', nameGenGender: 'F' },
-      { calling: null, nameGenGender: 'F' },
-      { calling: null, nameGenGender: 'M' },
-    ];
 
     const people: Person[] = [];
     callingsList.forEach((item, index) => {
@@ -302,6 +319,7 @@ export class GameEngine {
         need: null,
         isExternal: true,
         externalState: 'UNCONNECTED',
+        remainingStayTime: 60 + Math.random() * 40,
         wobbleOffset: Math.random() * Math.PI * 2,
         contribution: {
           reachedCount: 0,
@@ -322,10 +340,6 @@ export class GameEngine {
       type: 'BLESSING',
     };
 
-    const possibleMaps: MapId[] = ['CAMPUS', 'COUNTRYSIDE', 'DOWNTOWN'];
-    const randomMapId = possibleMaps[Math.floor(Math.random() * possibleMaps.length)];
-    this.mapSystem.setMap(randomMapId);
-
     return {
       timeElapsed: 0,
       isPaused: false,
@@ -335,7 +349,7 @@ export class GameEngine {
       attention: 3.0,
       maxAttention: 3,
       particles: [],
-      mapId: randomMapId,
+      mapId: effectiveMapId,
       actions: this.actionSystem.actions,
       selectedActionId: null,
       communities: [initialCommunity],
@@ -346,7 +360,7 @@ export class GameEngine {
         timeElapsed: 0,
         isReleaseActive: false,
         isGameOver: false,
-        mapId: randomMapId,
+        mapId: effectiveMapId,
         peopleReached: 0,
         newcomerCount: 0,
         leadersTrained: 0,
@@ -476,6 +490,7 @@ export class GameEngine {
     // 3. Update People Movement & Steering
     const world = { width: this.worldWidth, height: this.worldHeight };
     const isSunday = this.state.timeElapsed > 10 && (this.state.timeElapsed % 180) < 15;
+    const currentMapProfile = this.mapSystem.getMapProfile();
     
     for (const person of this.state.people) {
       const { fx, fy, maxSpeed } = calculatePersonSteering(
@@ -485,7 +500,9 @@ export class GameEngine {
         world,
         dt,
         this.state.isReleaseActive,
-        isSunday
+        isSunday,
+        currentMapProfile,
+        this.mapSystem
       );
 
       person.vx = (person.vx + fx * dt) * 0.92;
@@ -499,6 +516,22 @@ export class GameEngine {
 
       person.x += person.vx * dt;
       person.y += person.vy * dt;
+
+      // TASK HK4-012: External Person Dynamic Stay Time Churn
+      if (person.isExternal && person.externalState === 'UNCONNECTED') {
+        if (person.remainingStayTime === undefined) {
+          person.remainingStayTime = currentMapProfile.averageStayTime * (50 + Math.random() * 40);
+        }
+        person.remainingStayTime -= dt;
+        // If stay time expires and seeker hasn't been contacted, relocate outward
+        if (person.remainingStayTime <= 0) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 280 + Math.random() * 80;
+          person.x = this.worldWidth / 2 + Math.cos(angle) * dist;
+          person.y = this.worldHeight / 2 + Math.sin(angle) * dist;
+          person.remainingStayTime = currentMapProfile.averageStayTime * (50 + Math.random() * 40);
+        }
+      }
 
       // Update Need countdown and gradual decay
       if (person.need) {
@@ -636,7 +669,7 @@ export class GameEngine {
         comm,
         this.state.people,
         mapProfile,
-        this.vulnerabilities,
+        this.getVulnerabilities(comm.id),
         dt,
         this.state.timeElapsed
       );
@@ -814,7 +847,30 @@ export class GameEngine {
   }
 
   public triggerCallingDiscovery(person: Person, comm: Community) {
-    const mentor = this.state.people.find(p => p.communityId === comm.id && p.id !== person.id && p.calling !== null);
+    // TASK HK4-130: Relational Mentor Selection (caregiver -> direct interaction/holding -> nearest mature leader)
+    let mentor: Person | null = null;
+    if (person.caregiverId) {
+      mentor = this.state.people.find(p => p.id === person.caregiverId && p.calling !== null) || null;
+    }
+    if (!mentor && person.contactWithId) {
+      mentor = this.state.people.find(p => p.id === person.contactWithId && p.calling !== null) || null;
+    }
+    if (!mentor && person.beingHeldById) {
+      mentor = this.state.people.find(p => p.id === person.beingHeldById && p.calling !== null) || null;
+    }
+    if (!mentor) {
+      let minDistance = Infinity;
+      for (const other of this.state.people) {
+        if (other.communityId === comm.id && other.id !== person.id && (other.calling !== null || other.isMatureDisciple)) {
+          const d = Math.hypot(person.x - other.x, person.y - other.y);
+          if (d < minDistance) {
+            minDistance = d;
+            mentor = other;
+          }
+        }
+      }
+    }
+
     const calling = CallingSystem.discoverCalling(
       person,
       comm,
@@ -825,6 +881,8 @@ export class GameEngine {
     if (mentor) {
       const trainRes = GenerationSystem.trainDisciple(mentor, person);
       generation = trainRes.nextGen;
+      person.trainedById = mentor.id;
+      person.parentLeaderId = mentor.id;
     } else {
       person.generation = 1;
       person.isMatureDisciple = true;
@@ -892,6 +950,11 @@ export class GameEngine {
       this.state.actions = this.actionSystem.actions;
       soundEngine.playCardUse();
       this.logEvent(result.message, 'BLESSING');
+
+      // Trigger Word of Life toast notification
+      if (actionId === 'WORD') {
+        this.onWordProclaimed?.();
+      }
 
       // Spawn blessing particles for CARE action
       if (actionId === 'CARE') {
@@ -1091,7 +1154,11 @@ export class GameEngine {
   }
 
   // Execute SEND strategic action
-  public sendLeader(leaderId: string, targetDirection: 'EAST' | 'SOUTH' | 'WEST' | 'NORTH'): boolean {
+  public sendLeader(
+    leaderId: string,
+    targetDest: 'EAST' | 'SOUTH' | 'WEST' | 'NORTH' | string,
+    targetCoords?: { x: number; y: number }
+  ): boolean {
     if (this.state.isReleaseActive) return false;
     if (this.state.communities.length >= 3) return false;
 
@@ -1110,15 +1177,27 @@ export class GameEngine {
       );
     }
 
-    // Set a much larger offset to ensure the new community is planted sufficiently far away without overlap.
-    const offset = 650;
     let targetX = sourceComm.centerX;
     let targetY = sourceComm.centerY;
 
-    if (targetDirection === 'EAST') targetX += offset;
-    if (targetDirection === 'WEST') targetX -= offset;
-    if (targetDirection === 'SOUTH') targetY += offset;
-    if (targetDirection === 'NORTH') targetY -= offset;
+    if (targetCoords) {
+      targetX = targetCoords.x;
+      targetY = targetCoords.y;
+    } else {
+      // Check if targetDest is a Zone ID in current map (TASK HK4-140)
+      const profile = this.mapSystem.getMapProfile();
+      const zone = profile.zones.find(z => z.id === targetDest);
+      if (zone) {
+        targetX = zone.relX * this.worldWidth;
+        targetY = zone.relY * this.worldHeight;
+      } else {
+        const offset = 650;
+        if (targetDest === 'EAST') targetX += offset;
+        if (targetDest === 'WEST') targetX -= offset;
+        if (targetDest === 'SOUTH') targetY += offset;
+        if (targetDest === 'NORTH') targetY += offset;
+      }
+    }
 
     // Use a larger bound margin (e.g. 250) so they aren't squished on the very edge of the map
     targetX = clamp(targetX, 250, this.worldWidth - 250);
@@ -1126,11 +1205,11 @@ export class GameEngine {
 
     leader.isBeingSent = true;
     
-    // Select up to 20% of source community members to follow the leader
+    // TASK HK4-141: Leader + 1 Companion maximum (protecting mother community's care stability)
     const sourceMembers = this.state.people.filter(p => p.communityId === sourceComm.id && p.id !== leader.id);
-    const maxFollowers = Math.floor(sourceMembers.length * 0.2);
+    const maxFollowers = sourceMembers.length >= 6 ? 1 : 0;
     
-    // Sort by depth to bring mature members or random. Let's just shuffle or sort by depth.
+    // Sort by depth to bring 1 faithful mature companion
     sourceMembers.sort((a, b) => b.depth - a.depth);
     const followers = sourceMembers.slice(0, maxFollowers);
 
@@ -1148,7 +1227,7 @@ export class GameEngine {
     });
 
     this.logEvent(
-      `${leader.name} 사역자와 ${followers.length}명의 동역자가 새로운 지경을 향해 믿음으로 파송되었습니다!`,
+      `${leader.name} 사역자와 ${followers.length > 0 ? followers[0].name + ' 동역자가' : '사역자가'} 새로운 지경을 향해 믿음으로 파송되었습니다!`,
       'SEND'
     );
     return true;
@@ -1379,18 +1458,21 @@ export class GameEngine {
     const needType = person.need.type;
     person.need = null;
 
+    const targetCommId = person.communityId || 'comm_1';
+    const commVuln = this.getVulnerabilities(targetCommId);
+
     switch (needType) {
       case 'QUESTION':
-        this.vulnerabilities.confusion += 10;
+        commVuln.confusion += 10;
         break;
       case 'NEWCOMER':
-        this.vulnerabilities.division += 10;
+        commVuln.division += 10;
         break;
       case 'WEARY':
-        this.vulnerabilities.burnout += 10;
+        commVuln.burnout += 10;
         break;
       case 'TENSION':
-        this.vulnerabilities.division += 12;
+        commVuln.division += 12;
         break;
     }
 
@@ -1470,6 +1552,7 @@ export class GameEngine {
         need: null,
         isExternal: true,
         externalState: 'UNCONNECTED',
+        remainingStayTime: 60 + Math.random() * 40,
         wobbleOffset: Math.random() * Math.PI * 2,
         contribution: {
           reachedCount: 0,

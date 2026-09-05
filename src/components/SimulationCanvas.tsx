@@ -244,6 +244,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         engine.state.communities
       );
 
+      // TASK HK4-130: Draw Map Environmental Zones & Regional Influence
+      drawMapZones(ctx, engine.mapSystem, engine.worldWidth, engine.worldHeight, time);
+
       // Draw Organic Community Blobs
       const isSunday = engine.state.timeElapsed > 10 && (engine.state.timeElapsed % 180) < 15;
 
@@ -624,6 +627,58 @@ function drawBackgroundAmbience(
   ctx.restore();
 }
 
+// Helper: Draw Environmental Zones & Regional Influence
+function drawMapZones(
+  ctx: CanvasRenderingContext2D,
+  mapSystem: any,
+  worldWidth: number,
+  worldHeight: number,
+  time: number
+) {
+  if (!mapSystem) return;
+  const zones = mapSystem.getAbsoluteZones(worldWidth, worldHeight);
+  if (!zones || zones.length === 0) return;
+
+  ctx.save();
+  for (const zone of zones) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 0.001 + zone.x * 0.01);
+    
+    // Zone radial ambient fill
+    const grad = ctx.createRadialGradient(zone.x, zone.y, 0, zone.x, zone.y, zone.radius);
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.04)');
+    grad.addColorStop(0.75, 'rgba(56, 189, 248, 0.02)');
+    grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Zone delicate dashed perimeter
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = `rgba(148, 163, 184, ${0.12 + pulse * 0.06})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Zone Title and Influence badge (subtle display at top of zone)
+    ctx.font = '600 11px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(203, 213, 225, 0.6)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`📍 ${zone.name}`, zone.x, zone.y - zone.radius + 16);
+
+    ctx.font = '400 9px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.45)';
+    ctx.fillText(
+      `이동 ${zone.influence.speedMultiplier}x · 관계 ${zone.influence.relationshipMultiplier}x`,
+      zone.x,
+      zone.y - zone.radius + 28
+    );
+  }
+  ctx.restore();
+}
+
 // Helper: Relationship, Orbit, & Open Door connection paths
 function drawRelationshipTrails(ctx: CanvasRenderingContext2D, people: Person[]) {
   ctx.save();
@@ -711,6 +766,23 @@ function drawRelationshipTrails(ctx: CanvasRenderingContext2D, people: Person[])
           ctx.strokeStyle = p.caregiverId ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.05)';
           ctx.lineWidth = 1;
           ctx.stroke();
+        }
+      }
+    }
+
+    // TASK HK4-140: Shepherd Care Target Lines
+    if (p.calling === 'SHEPHERD' && p.careTargets && p.careTargets.length > 0) {
+      for (const targetId of p.careTargets) {
+        const target = people.find(m => m.id === targetId);
+        if (target) {
+          ctx.beginPath();
+          ctx.setLineDash([2, 4]);
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(target.x, target.y);
+          ctx.strokeStyle = 'rgba(52, 211, 153, 0.28)'; // Soft emerald flock tether
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.setLineDash([]);
         }
       }
     }

@@ -161,5 +161,43 @@ export function drawOrganicBlob(
     ctx.setLineDash([]);
   }
 
+  // TASK HK4-150: Deception Visual Rendering
+  if (comm.drift?.type === 'DECEPTION') {
+    const deceptionIntensity = (comm.drift.intensity || 20) / 100;
+    if (!comm.drift.discovered) {
+      // Undiscovered: subtle violet/purple shadow and eerie perimeter haze
+      ctx.beginPath();
+      ctx.arc(comm.centerX, comm.centerY, comm.currentRadius * 0.95, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(168, 85, 247, ${0.25 + deceptionIntensity * 0.35})`; // purple haze
+      ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // If detection is in progress by Teachers, render Teacher discernment arc
+      if (comm.drift.detectionProgress && comm.drift.detectionProgress > 0) {
+        const prog = comm.drift.detectionProgress / 100;
+        ctx.beginPath();
+        ctx.arc(
+          comm.centerX,
+          comm.centerY,
+          comm.currentRadius * 1.05,
+          -Math.PI / 2,
+          -Math.PI / 2 + Math.PI * 2 * prog
+        );
+        ctx.strokeStyle = 'rgba(234, 179, 8, 0.85)'; // glowing gold discernment arc
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+    } else {
+      // Discovered: Golden truth boundary with clear discernment
+      ctx.beginPath();
+      ctx.arc(comm.centerX, comm.centerY, comm.currentRadius * 1.02, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    }
+  }
+
   ctx.restore();
 }

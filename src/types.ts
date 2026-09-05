@@ -101,6 +101,10 @@ export interface Person {
   // Relational unique tracking
   caredPersonIds?: string[];
   reachedPersonIds?: string[];
+
+  // Map & Zone Environment Integration (Section 25-35)
+  remainingStayTime?: number; // Average stay time countdown for dynamic external flow
+  currentZoneName?: string; // Zone this person is currently situated within
   
   // Pastoral Rescue & Holding System (Holding onto leaving/lukewarm members)
   beingHeldById?: string | null; // ID of the shepherd holding and comforting this person
@@ -179,6 +183,7 @@ export interface CommunityDrift {
   type: DriftType;
   intensity: number;   // 0-100 (Doesn't auto-expire, multi-action mitigation)
   discovered: boolean; // Teacher reveals Deception
+  detectionProgress?: number; // 0-100% progress until discovery (Teacher discernment)
   duration: number;
   title: string;
   description: string;

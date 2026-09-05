@@ -51,7 +51,7 @@ export const BASE_ACTIONS_CONFIG: Record<ActionId, Omit<PlayerAction, 'currentCo
     koreanName: '심방/돌봄',
     subtitle: '말씀 확신 심방 & 치유',
     description: '말씀에 확신이 흔들리거나 깊은 회의/의문(QUESTION)이 있는 지체를 1:1 심방하여 확신을 심어주고, 상처와 소진을 보듬어 이탈을 막습니다.',
-    cooldown: 20,
+    cooldown: 10,
     attentionCost: 1,
     icon: 'Heart',
     targetType: 'PERSON',

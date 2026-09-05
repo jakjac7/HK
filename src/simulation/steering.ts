@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Person, Community, CommunityPriority } from '../types';
+import { Person, Community, CommunityPriority, MapProfile } from '../types';
+import { MapSystem } from '../systems/MapSystem';
 
 export interface WorldBounds {
   width: number;
@@ -30,7 +31,9 @@ export function calculatePersonSteering(
   world: WorldBounds,
   dt: number,
   isReleaseActive: boolean,
-  isSunday: boolean = false
+  isSunday: boolean = false,
+  mapProfile?: MapProfile,
+  mapSystem?: MapSystem
 ): { fx: number; fy: number; maxSpeed: number } {
   let fx = 0;
   let fy = 0;
@@ -38,6 +41,24 @@ export function calculatePersonSteering(
   // Max speed affected by burnout
   const burnoutPenalty = 1 - (person.burnout / 100) * 0.55;
   let maxSpeed = (person.isExternal ? 28 : 42) * burnoutPenalty;
+
+  // TASK HK4-010: Map Mobility Integration
+  const mobility = mapProfile?.mobility ?? 1.0;
+  // External person speed scales directly with map mobility
+  // Community members have gentle damping: 1 + (mobility - 1) * 0.25
+  const mobilityMult = person.isExternal ? mobility : (1 + (mobility - 1) * 0.25);
+  maxSpeed *= mobilityMult;
+
+  // TASK HK4-013: Zone Influence on Speed and Person Zone Tracking
+  if (mapSystem && mapProfile) {
+    const zone = mapSystem.getZoneAt(person.x, person.y, world.width, world.height);
+    if (zone) {
+      maxSpeed *= zone.influence.speedMultiplier;
+      person.currentZoneName = zone.name;
+    } else {
+      person.currentZoneName = undefined;
+    }
+  }
   
   if (person.need) {
     const needProg = 1 - (person.need.duration / person.need.maxDuration);
@@ -170,10 +191,12 @@ export function calculatePersonSteering(
     });
 
     const isEvangelist = person.calling === 'EVANGELIST';
-    const contactRange = isEvangelist ? 42 : 32;
+    // TASK HK4-100: Evangelists (or believers when Priority is GO) actively seek external people
+    const canEngageSeekers = isEvangelist || commPriority === 'GO';
+    const contactRange = isEvangelist ? 46 : (commPriority === 'GO' ? 34 : 22);
 
     // Acquire new seeker targets up to the strict limit of 2 concurrent markings
-    if (person.engagedSeekerIds.length < 2) {
+    if (canEngageSeekers && person.engagedSeekerIds.length < 2) {
       for (const other of allPeople) {
         if (person.engagedSeekerIds.length >= 2) break;
         if (
@@ -215,7 +238,17 @@ export function calculatePersonSteering(
           const nearbyBelievers = allPeople.filter(p => !p.isExternal && p.engagedSeekerIds?.includes(seeker.id));
           const synergy = nearbyBelievers.length >= 2 ? 1.35 : 1.0;
           
-          seeker.contactDuration += dt * synergy;
+          // TASK HK4-011: Map Openness and Zone Relationship influence
+          const openness = mapProfile?.openness ?? 1.0;
+          let zoneRel = 1.0;
+          if (mapSystem && mapProfile) {
+            const zone = mapSystem.getZoneAt(seeker.x, seeker.y, world.width, world.height);
+            if (zone) {
+              zoneRel = zone.influence.relationshipMultiplier;
+            }
+          }
+
+          seeker.contactDuration += dt * synergy * openness * zoneRel;
           seeker.contactProgress = Math.min(100, (seeker.contactDuration / seeker.requiredContactDuration) * 100);
 
           // Update milestone stages (1: Interest/Dialogue, 2: Heart Opened, 3: Trust & Gospel)
@@ -254,15 +287,17 @@ export function calculatePersonSteering(
     switch (person.calling) {
       case 'EVANGELIST': {
         // High Outside Movement Frequency & Boundary Crossing
-        // Seeks external unconnected people or Open Doors
+        // Seeks external unconnected people or Open Doors using MapSystem target utility (TASK HK4-010)
         let externalTarget: Person | null = null;
-        let minD = Infinity;
+        let highestUtilityScore = -Infinity;
 
         for (const other of allPeople) {
           if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
             const d = distance(person.x, person.y, other.x, other.y);
-            if (d < minD) {
-              minD = d;
+            const utility = mapSystem ? mapSystem.evaluateEvangelistTargetUtility(other, other.x, other.y, world.width, world.height, commPriority === 'GO') : 1;
+            const score = utility / Math.max(25, d);
+            if (score > highestUtilityScore) {
+              highestUtilityScore = score;
               externalTarget = other;
             }
           }
@@ -270,10 +305,13 @@ export function calculatePersonSteering(
 
         const goMultiplier = commPriority === 'GO' ? 1.5 : 1.0;
 
-        if (externalTarget && minD < commRadius * 3.5) {
-          // Evangelist steps out to meet external target
-          fx += ((externalTarget.x - person.x) / minD) * 55 * goMultiplier;
-          fy += ((externalTarget.y - person.y) / minD) * 55 * goMultiplier;
+        if (externalTarget) {
+          const d = distance(person.x, person.y, externalTarget.x, externalTarget.y);
+          if (d < commRadius * 3.5) {
+            // Evangelist steps out to meet external target
+            fx += ((externalTarget.x - person.x) / Math.max(1, d)) * 55 * goMultiplier;
+            fy += ((externalTarget.y - person.y) / Math.max(1, d)) * 55 * goMultiplier;
+          }
         } else {
           // Patrol between edge and outside
           const angle = (person.wobbleOffset + performance.now() * 0.0008) % (Math.PI * 2);
@@ -533,14 +571,17 @@ export function calculatePersonSteering(
           fy += ((targetCenterY - person.y) / d) * 38;
         }
 
-        // Draw nearby members slightly closer
+        // TASK HK4-110: Worship Gathering Field
+        // Radiates an attractive harmony field pulling community members gently towards unity
         for (const other of allPeople) {
           if (other.communityId === comm.id && other.id !== person.id) {
             const od = distance(person.x, person.y, other.x, other.y);
-            if (od < commRadius * 0.8 && od > 25) {
-              // Gentle gravitational unity pull
-              fx += ((other.x - person.x) / od) * 8;
-              fy += ((other.y - person.y) / od) * 8;
+            if (od < commRadius * 0.9 && od > 20) {
+              // Gentle harmonic gravitational pull
+              const pullFactor = (1 - od / (commRadius * 0.9)) * 14;
+              fx += ((other.x - person.x) / od) * 4;
+              other.vx += ((person.x - other.x) / od) * pullFactor * dt;
+              other.vy += ((person.y - other.y) / od) * pullFactor * dt;
             }
           }
         }

@@ -18,61 +18,66 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
     <div
       id="tutorial-guide-modal-backdrop"
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden"
     >
       <div
         id="tutorial-guide-modal"
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm sm:rounded-md p-5 shadow-2xl text-[#F5F5F5] flex flex-col gap-4 my-6 animate-in zoom-in-95 duration-200"
+        className="w-full max-w-lg max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212] border border-white/15 rounded-md shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <div>
-            <span className="text-[10px] font-bold font-mono text-amber-400 tracking-widest uppercase">
-              HIS KINGDOM · PRINCIPLE GUIDE
-            </span>
-            <h2 className="text-lg font-serif font-extrabold mt-0.5 tracking-tight text-[#F5F5F5]">
-              그리스도의 몸과 공동체 원리
-            </h2>
+        {/* Sticky Header */}
+        <div className="shrink-0 flex flex-col gap-3 border-b border-white/10 px-4 py-3 bg-[#161616]">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold font-mono text-amber-400 tracking-widest uppercase">
+                HIS KINGDOM · PRINCIPLE GUIDE
+              </span>
+              <h2 className="text-base sm:text-lg font-serif font-extrabold mt-0.5 tracking-tight text-[#F5F5F5]">
+                그리스도의 몸과 공동체 원리
+              </h2>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-sm hover:bg-white/10 text-white/40 hover:text-white/80 cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-sm hover:bg-white/10 text-white/40 hover:text-white/80">
-            <X className="w-5 h-5" />
-          </button>
+
+          {/* Tab Selector in Geometric Balance style */}
+          <div className="flex rounded-sm bg-white/5 p-1 border border-white/10 text-xs font-mono">
+            <button
+              onClick={() => setActiveTab('CALLINGS')}
+              className={`flex-1 py-1.5 rounded-sm font-semibold transition-all ${
+                activeTab === 'CALLINGS'
+                  ? 'bg-amber-400 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+                  : 'text-white/50 hover:text-white/80'
+              }`}
+            >
+              5대 은사 (Callings)
+            </button>
+            <button
+              onClick={() => setActiveTab('FLOW')}
+              className={`flex-1 py-1.5 rounded-sm font-semibold transition-all ${
+                activeTab === 'FLOW'
+                  ? 'bg-amber-400 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+                  : 'text-white/50 hover:text-white/80'
+              }`}
+            >
+              시각적 흐름 (Visual)
+            </button>
+            <button
+              onClick={() => setActiveTab('PRINCIPLES')}
+              className={`flex-1 py-1.5 rounded-sm font-semibold transition-all ${
+                activeTab === 'PRINCIPLES'
+                  ? 'bg-amber-400 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+                  : 'text-white/50 hover:text-white/80'
+              }`}
+            >
+              핵심 원리 & 파송
+            </button>
+          </div>
         </div>
 
-        {/* Tab Selector in Geometric Balance style */}
-        <div className="flex rounded-sm bg-white/5 p-1 border border-white/10 text-xs font-mono">
-          <button
-            onClick={() => setActiveTab('CALLINGS')}
-            className={`flex-1 py-1.5 rounded-sm font-semibold transition-all ${
-              activeTab === 'CALLINGS'
-                ? 'bg-amber-400 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-          >
-            5대 은사 (Callings)
-          </button>
-          <button
-            onClick={() => setActiveTab('FLOW')}
-            className={`flex-1 py-1.5 rounded-sm font-semibold transition-all ${
-              activeTab === 'FLOW'
-                ? 'bg-amber-400 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-          >
-            시각적 흐름 (Visual)
-          </button>
-          <button
-            onClick={() => setActiveTab('PRINCIPLES')}
-            className={`flex-1 py-1.5 rounded-sm font-semibold transition-all ${
-              activeTab === 'PRINCIPLES'
-                ? 'bg-amber-400 text-black font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-          >
-            핵심 원리 & 파송
-          </button>
-        </div>
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto px-4 py-3.5 space-y-3.5 min-h-0 text-left">
 
         {/* Tab 1: 5 Callings */}
         {activeTab === 'CALLINGS' && (
@@ -217,13 +222,17 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
             </div>
           </div>
         )}
+        </div>
 
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 rounded-sm font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_20px_rgba(251,191,36,0.25)] transition-all mt-1 font-mono uppercase tracking-wider"
-        >
-          확인하고 사역으로 돌아가기
-        </button>
+        {/* Sticky Footer */}
+        <div className="shrink-0 p-3 sm:p-4 border-t border-white/10 bg-[#161616]">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-sm font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_20px_rgba(251,191,36,0.25)] transition-all font-mono uppercase tracking-wider cursor-pointer"
+          >
+            확인하고 사역으로 돌아가기
+          </button>
+        </div>
       </div>
     </div>
   );

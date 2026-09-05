@@ -78,15 +78,18 @@ export class ReleaseSystem {
     const preIntegrity = snapshot ? Math.max(1, snapshot.integrity) : 75;
     const healthRetention = Math.min(100, (postHealth / preHealth) * 100);
     const integrityRetention = Math.min(100, (postIntegrity / preIntegrity) * 100);
-    const communitySurvival = currentCommunities.length > 0 ? 100 : 0;
 
-    // Autonomous actions weight
+    // TASK HK4-050: Rigorous Community Survival Ratio (post / pre * 100)
+    const preCommunityCount = snapshot ? Math.max(1, snapshot.communityCount) : Math.max(1, currentCommunities.length);
+    const communitySurvival = Math.min(100, Math.round((currentCommunities.length / preCommunityCount) * 100));
+
+    // TASK HK4-051: Remove arbitrary +40 floor. Normalized against expected ~14 autonomous actions
     const totalAutoActions =
       stats.autonomousCareCount +
       stats.autonomousReachCount +
       stats.autonomousFormationCount +
       stats.autonomousCrisesResolved * 5;
-    const autonomousScore = Math.min(100, Math.round(totalAutoActions * 3.5 + 40));
+    const autonomousScore = Math.min(100, Math.round(totalAutoActions * 7));
 
     // Care stability
     const totalCapacity = currentCommunities.reduce((acc, c) => acc + c.stats.careCapacity, 0);
@@ -108,11 +111,20 @@ export class ReleaseSystem {
       g2g3Score * 0.10
     );
 
+    // TASK HK4-052: S Gate Criteria
+    // FinalScore >= 85, G3 >= 1, ReleaseSurvival >= 80, Integrity >= 70, no catastrophic care collapse
+    const qualifiesForS =
+      finalScore >= 85 &&
+      g3Count >= 1 &&
+      communitySurvival >= 80 &&
+      postIntegrity >= 70 &&
+      postPop <= totalCapacity + 2;
+
     let finalGrade: 'S' | 'A' | 'B' | 'C' | 'D' = 'C';
-    if (finalScore >= 90) finalGrade = 'S';
-    else if (finalScore >= 80) finalGrade = 'A';
-    else if (finalScore >= 68) finalGrade = 'B';
-    else if (finalScore >= 50) finalGrade = 'C';
+    if (finalScore >= 85 && qualifiesForS) finalGrade = 'S';
+    else if (finalScore >= 78) finalGrade = 'A';
+    else if (finalScore >= 65) finalGrade = 'B';
+    else if (finalScore >= 48) finalGrade = 'C';
     else finalGrade = 'D';
 
     // Generate up to 3 causal reflection sentences (Section 50)

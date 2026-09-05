@@ -42,49 +42,42 @@ export class CallingSystem {
       }
     });
 
-    // Check for extreme shortage (0 of a critical role like SHEPHERD or TEACHER in a growing community)
-    const totalPop = allCommunityPeople.length;
-    if (totalPop >= 6 && counts.SHEPHERD === 0 && Math.random() < 0.85) {
-      return 'SHEPHERD';
-    }
-    if (totalPop >= 6 && counts.TEACHER === 0 && Math.random() < 0.75) {
-      return 'TEACHER';
-    }
+    // Weight computation per TASK HK4-030:
+    // Base 70%, Deficit Weight 20%, Extreme Pity 10% in a unified weighted distribution
+    const minCount = Math.min(...Object.values(counts));
+    const maxCount = Math.max(...Object.values(counts));
 
-    // Weight computation
     const weights: Record<NonNullable<CallingType>, number> = {
-      EVANGELIST: 20,
-      SHEPHERD: 20,
-      TEACHER: 20,
-      INTERCESSOR: 20,
-      WORSHIPPER: 20,
+      EVANGELIST: 70,
+      SHEPHERD: 70,
+      TEACHER: 70,
+      INTERCESSOR: 70,
+      WORSHIPPER: 70,
     };
 
-    const minCount = Math.min(...Object.values(counts));
-
     ALL_CALLINGS.forEach(c => {
-      const deficit = counts[c] - minCount;
-      if (counts[c] === 0) {
-        weights[c] += 30; // Strong boost if 0
-      } else if (deficit === 0) {
-        weights[c] += 15; // Moderate boost if at minimum
-      } else {
-        weights[c] = Math.max(5, weights[c] - deficit * 6);
+      // Deficit Weight: boost roles that have fewer members
+      const deficit = maxCount - counts[c];
+      weights[c] += deficit * 15;
+
+      // Extreme Pity: if a role is completely absent in a growing community (>= 6 members)
+      if (counts[c] === 0 && allCommunityPeople.length >= 6) {
+        weights[c] += 25;
       }
     });
 
-    // Special map adjustments can slightly influence calling emergence naturally:
+    // Special natural situational influences
     if (community.stats.uncaredCount > 0) {
-      weights.SHEPHERD += 25;
+      weights.SHEPHERD += 15;
     }
     if (community.drift?.type === 'DECEPTION') {
-      weights.TEACHER += 20;
+      weights.TEACHER += 15;
     }
     if (community.drift?.type === 'BURNOUT') {
-      weights.INTERCESSOR += 20;
+      weights.INTERCESSOR += 15;
     }
 
-    // Weighted random pick
+    // Weighted random pick (Purity guaranteed - no hard overrides)
     const totalWeight = ALL_CALLINGS.reduce((acc, c) => acc + weights[c], 0);
     let rand = Math.random() * totalWeight;
 
@@ -95,7 +88,7 @@ export class CallingSystem {
       rand -= weights[c];
     }
 
-    return 'SHEPHERD'; // Fallback
+    return ALL_CALLINGS[Math.floor(Math.random() * ALL_CALLINGS.length)];
   }
 
   /**

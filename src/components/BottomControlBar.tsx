@@ -103,9 +103,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   return (
     <footer
       id="bottom-control-bar"
-      className="relative z-30 w-full bg-[#121212]/95 backdrop-blur-md border-t border-white/10 px-3 py-2 text-[#F5F5F5] select-none"
+      className="relative z-30 w-full bg-[#121212]/95 backdrop-blur-md border-t border-white/10 px-2 sm:px-4 py-2 text-[#F5F5F5] select-none shrink-0"
     >
-      <div className="w-full flex flex-col gap-2 max-w-7xl mx-auto">
+      <div className="w-full flex flex-col gap-1.5 max-w-5xl mx-auto">
         {/* Row 1: Attention (Left) and Priority (Right) */}
         <div className="w-full flex justify-between items-center px-1">
           {/* Left Wing: Attention Orbs (행동력) */}
@@ -125,7 +125,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
             >
               <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full cursor-help">
                 <span className="text-[10px] font-serif font-bold text-amber-300/80">
-                  시선
+                  집중
                 </span>
                 <div className="flex items-center gap-1">
                   {[0, 1, 2].map(idx => {
@@ -162,7 +162,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   <div>
                     <p className="font-bold text-cyan-300">선교 우선 (GO)</p>
                     <p className="text-white/70 mt-0.5">
-                      전도자가 활발히 움직여 외부 영혼 찾음과 새가족 유입을 촉진합니다.
+                      전도자가 활발히 움직여 외부 이웃과의 관계 맺음과 새가족 유입을 촉진합니다.
                     </p>
                   </div>
                 }
@@ -189,7 +189,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   <div>
                     <p className="font-bold text-indigo-300">말씀 우선 (ROOT)</p>
                     <p className="text-white/70 mt-0.5">
-                      교사의 말씀 나눔으로 복음의 농도를 심화하고 이단을 분별합니다.
+                      교사의 말씀 나눔으로 복음의 깊이를 더하고 거짓 가르침을 분별합니다.
                     </p>
                   </div>
                 }
@@ -214,9 +214,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                 position="top"
                 content={
                   <div>
-                    <p className="font-bold text-emerald-300">양육 우선 (CARE)</p>
+                    <p className="font-bold text-emerald-300">돌봄 우선 (CARE)</p>
                     <p className="text-white/70 mt-0.5">
-                      목자의 심방과 사랑으로 낙심한 지체를 품고 이탈을 방지합니다.
+                      목자의 심방과 사랑으로 지친 사람을 품고 이탈을 방지합니다.
                     </p>
                   </div>
                 }
@@ -245,81 +245,83 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           </div>
         </div>
 
-        {/* Row 2 & Row 3: Strategic Action Buttons (Compact Chips) + SEND (Wrapped over 2 lines) */}
-        <div className="flex flex-wrap justify-center items-center gap-1.5 sm:gap-2 w-full max-w-lg mx-auto pb-0.5 px-1">
-          {actions.filter(act => act.id !== 'SEND').map(act => {
-            const isSelected = activeActionId === act.id;
-            const isOnCooldown = act.currentCooldown > 0.05;
-            const canAfford = attention >= act.attentionCost;
-            const isAvailable = !isOnCooldown && canAfford;
+        {/* Row 2: Strategic Action Buttons + SEND */}
+        <div className="flex flex-wrap sm:flex-nowrap justify-center sm:justify-between items-center gap-2 w-full max-w-2xl mx-auto pb-0.5 px-1">
+          <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
+            {actions.filter(act => act.id !== 'SEND').map(act => {
+              const isSelected = activeActionId === act.id;
+              const isOnCooldown = act.currentCooldown > 0.05;
+              const canAfford = attention >= act.attentionCost;
+              const isAvailable = !isOnCooldown && canAfford;
 
-            return (
-              <Tooltip
-                key={act.id}
-                position="top"
-                content={
-                  <div>
-                    <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1 mb-1">
-                      <span className="font-bold text-amber-300">{act.koreanName}</span>
-                      <span className="text-[10px] font-mono text-amber-400">
-                        비용: {act.attentionCost}●
-                      </span>
+              return (
+                <Tooltip
+                  key={act.id}
+                  position="top"
+                  content={
+                    <div>
+                      <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1 mb-1">
+                        <span className="font-bold text-amber-300">{act.koreanName}</span>
+                        <span className="text-[10px] font-mono text-amber-400">
+                          비용: {act.attentionCost}●
+                        </span>
+                      </div>
+                      <p className="text-white/80 leading-tight">{act.description}</p>
+                      {act.targetType === 'PERSON' && (
+                        <p className="text-[10px] text-amber-200/70 mt-1 italic">
+                          * 지체 선택 후 클릭 또는 클릭 후 지체 탭
+                        </p>
+                      )}
+                      {isOnCooldown && (
+                        <p className="text-[10px] text-rose-400 mt-1 font-mono">
+                          재사용 대기시간: {Math.ceil(act.currentCooldown)}초
+                        </p>
+                      )}
                     </div>
-                    <p className="text-white/80 leading-tight">{act.description}</p>
-                    {act.targetType === 'PERSON' && (
-                      <p className="text-[10px] text-amber-200/70 mt-1 italic">
-                        * 지체 선택 후 클릭 또는 클릭 후 지체 탭
-                      </p>
-                    )}
-                    {isOnCooldown && (
-                      <p className="text-[10px] text-rose-400 mt-1 font-mono">
-                        재사용 대기시간: {Math.ceil(act.currentCooldown)}초
-                      </p>
-                    )}
-                  </div>
-                }
-              >
-                <button
-                  id={`action-btn-${act.id.toLowerCase()}`}
-                  onClick={() => handleActionClick(act.id)}
-                  disabled={!isAvailable && !isSelected}
-                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-serif transition-all cursor-pointer select-none shrink-0 ${
-                    isSelected
-                      ? 'bg-amber-400 text-black font-bold border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)] scale-105'
-                      : isAvailable
-                      ? 'bg-white/5 hover:bg-white/10 border-white/15 hover:border-amber-400/50 text-[#F5F5F5]'
-                      : 'bg-white/2 border-white/5 opacity-40 cursor-not-allowed text-white/50'
-                  }`}
+                  }
                 >
-                  {/* Cooldown Overlay */}
-                  {isOnCooldown && (
-                    <div className="absolute inset-0 bg-black/75 rounded-sm flex items-center justify-center font-mono font-bold text-amber-300 text-[10px] z-10">
-                      {Math.ceil(act.currentCooldown)}s
-                    </div>
-                  )}
-
-                  {/* Icon */}
-                  <span className={isSelected ? 'text-black' : 'text-amber-300'}>
-                    {renderActionIcon(act.id)}
-                  </span>
-
-                  {/* Short Name */}
-                  <span className="font-medium tracking-tight whitespace-nowrap">
-                    {getActionShortName(act.id)}
-                  </span>
-
-                  {/* Cost Pill */}
-                  <span
-                    className={`text-[9px] font-mono px-1 rounded-xs font-semibold ${
-                      isSelected ? 'bg-black/20 text-black' : 'text-amber-400/90'
+                  <button
+                    id={`action-btn-${act.id.toLowerCase()}`}
+                    onClick={() => handleActionClick(act.id)}
+                    disabled={!isAvailable && !isSelected}
+                    className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-serif transition-all cursor-pointer select-none shrink-0 ${
+                      isSelected
+                        ? 'bg-amber-400 text-black font-bold border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)] scale-105'
+                        : isAvailable
+                        ? 'bg-white/5 hover:bg-white/10 border-white/15 hover:border-amber-400/50 text-[#F5F5F5]'
+                        : 'bg-white/2 border-white/5 opacity-40 cursor-not-allowed text-white/50'
                     }`}
                   >
-                    {act.attentionCost}●
-                  </span>
-                </button>
-              </Tooltip>
-            );
-          })}
+                    {/* Cooldown Overlay */}
+                    {isOnCooldown && (
+                      <div className="absolute inset-0 bg-black/75 rounded-sm flex items-center justify-center font-mono font-bold text-amber-300 text-[10px] z-10">
+                        {Math.ceil(act.currentCooldown)}s
+                      </div>
+                    )}
+
+                    {/* Icon */}
+                    <span className={isSelected ? 'text-black' : 'text-amber-300'}>
+                      {renderActionIcon(act.id)}
+                    </span>
+
+                    {/* Short Name */}
+                    <span className="font-medium tracking-tight whitespace-nowrap">
+                      {getActionShortName(act.id)}
+                    </span>
+
+                    {/* Cost Pill */}
+                    <span
+                      className={`text-[9px] font-mono px-1 rounded-xs font-semibold ${
+                        isSelected ? 'bg-black/20 text-black' : 'text-amber-400/90'
+                      }`}
+                    >
+                      {act.attentionCost}●
+                    </span>
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
 
           {/* SEND Button */}
           <Tooltip
@@ -339,7 +341,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
             <button
               id="btn-open-send-modal"
               onClick={onOpenSendModal}
-              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-serif font-bold rounded-sm border transition-all cursor-pointer ${successionColors[succession]} shadow-sm shrink-0`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-serif font-bold rounded-sm border transition-all cursor-pointer ${successionColors[succession]} shadow-sm shrink-0 whitespace-nowrap`}
             >
               <Send className="w-3.5 h-3.5" />
               <span>파송</span>
