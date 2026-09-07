@@ -73,19 +73,19 @@ export const TopHUD: React.FC<TopHUDProps> = ({
 
   let phaseShort = '개척';
   let phaseFull = '생명의 씨앗 (개척)';
-  let phaseDesc = '성도들과의 인격적 만남과 복음의 기초를 세우는 시기입니다.';
+  let phaseDesc = '사람들과의 인격적 만남과 복음의 기초를 세우는 시기입니다.';
   if (timeElapsed >= 90 && timeElapsed < 210) {
     phaseShort = '교제';
-    phaseFull = '지체의 모임 (교제)';
+    phaseFull = '사람들의 모임 (교제)';
     phaseDesc = '식탁을 나누고 서로를 알아가며 유기적 사랑의 결속을 다집니다.';
   } else if (timeElapsed >= 210 && timeElapsed < 360) {
     phaseShort = '제자도';
     phaseFull = '말씀 양육 (제자도)';
-    phaseDesc = '말씀으로 사역자를 양육하고 은사와 부르심을 발견하게 합니다.';
+    phaseDesc = '말씀으로 역할을 양육하고 부르심을 발견하게 합니다.';
   } else if (timeElapsed >= 360 && timeElapsed < 540) {
     phaseShort = '파송';
     phaseFull = '지경의 확장 (파송)';
-    phaseDesc = '성숙한 제자를 세워 또 다른 선교지로 분립 개척을 준비합니다.';
+    phaseDesc = '성숙한 제자를 세워 또 다른 곳으로 파송을 준비합니다.';
   } else if (timeElapsed >= 540) {
     phaseShort = '맡겨드림';
     phaseFull = '성령께 온전히 맡겨드림';
@@ -289,12 +289,12 @@ export const TopHUD: React.FC<TopHUDProps> = ({
             content={
               <div>
                 <p className="font-bold text-amber-300">
-                  성도 현황: {activeMembers}명 / 돌봄 수용력: {careCapacityTotal}명
+                  사람 현황: {activeMembers}명 / 돌봄 수용력: {careCapacityTotal}명
                 </p>
                 <p className="text-white/70 mt-0.5">
                   {careGapTotal > 0
-                    ? `⚠️ 돌봄 공백 ${careGapTotal}명 발생! 목자의 심방이나 일꾼 육성이 시급합니다.`
-                    : '✅ 모든 지체가 안전하게 사랑의 돌봄을 받고 있습니다.'}
+                    ? `⚠️ 돌봄 공백 ${careGapTotal}명 발생! 목자의 돌봄이나 일꾼 육성이 시급합니다.`
+                    : '✅ 모든 사람이 안전하게 사랑의 돌봄을 받고 있습니다.'}
                 </p>
               </div>
             }
@@ -307,7 +307,7 @@ export const TopHUD: React.FC<TopHUDProps> = ({
               }`}
             >
               <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="text-[10px] sm:text-[11px] text-white/70 hidden sm:inline font-sans">성도/돌봄</span>
+              <span className="text-[10px] sm:text-[11px] text-white/70 hidden sm:inline font-sans">사람/돌봄</span>
               <span className="text-[10px] sm:text-[11px] font-mono font-bold">
                 {activeMembers}/{careCapacityTotal}
               </span>
@@ -331,7 +331,7 @@ export const TopHUD: React.FC<TopHUDProps> = ({
             content={
               <div>
                 <p className="font-bold text-indigo-300">
-                  말씀 (복음의 농도): {wordGrade.grade} ({wordGrade.level}/5단계)
+                  말씀 (깊이): {wordGrade.grade} ({wordGrade.level}/5단계)
                 </p>
                 <p className="text-white/70 mt-0.5">
                   십자가 복음이 심령에 뿌리내려 미혹과 이단을 분별하는 말씀의 깊이입니다.

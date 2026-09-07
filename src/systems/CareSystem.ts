@@ -123,13 +123,19 @@ export class CareSystem {
         }
       }
 
-      // If still unassigned, this person is UNCARED
+      // If still unassigned, this person is UNCARED (unless they have careGraceTimer active)
       if (!assigned) {
-        const wasUncared = target.careStatus === 'UNCARED';
-        target.careStatus = 'UNCARED';
-        target.caregiverId = undefined;
-        uncaredList.push(target);
-        if (!wasUncared) newlyUncared.push(target);
+        if (target.careGraceTimer && target.careGraceTimer > 0) {
+          target.careGraceTimer -= dt;
+          target.careStatus = 'CARED';
+          target.caregiverId = undefined; // No specific caregiver, just general grace
+        } else {
+          const wasUncared = target.careStatus === 'UNCARED';
+          target.careStatus = 'UNCARED';
+          target.caregiverId = undefined;
+          uncaredList.push(target);
+          if (!wasUncared) newlyUncared.push(target);
+        }
       }
     }
 

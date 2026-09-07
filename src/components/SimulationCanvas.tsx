@@ -264,18 +264,18 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       drawMapZones(ctx, engine.mapSystem, engine.worldWidth, engine.worldHeight, time);
 
       // Draw Organic Community Blobs
-      const isSunday = engine.state.timeElapsed > 10 && (engine.state.timeElapsed % 180) < 15;
-
       for (const comm of engine.state.communities) {
         drawOrganicBlob(ctx, comm, comm.hullPoints);
 
-        if (isSunday) {
+        // HK6-050: Replace Legacy Sunday visual pulse with real Worshipper-driven event
+        if (comm.lastWorshipPulse !== undefined && engine.state.timeElapsed - comm.lastWorshipPulse < 5) {
           ctx.save();
-          const pulse = (Math.sin(engine.state.timeElapsed * 4) + 1) / 2;
+          const progress = (engine.state.timeElapsed - comm.lastWorshipPulse) / 5;
+          const pulse = (Math.sin(progress * Math.PI) + 1) / 2;
           ctx.beginPath();
           ctx.arc(comm.centerX, comm.centerY, comm.currentRadius * 0.8, 0, Math.PI * 2);
           const gradient = ctx.createRadialGradient(comm.centerX, comm.centerY, 0, comm.centerX, comm.centerY, comm.currentRadius * 0.8);
-          gradient.addColorStop(0, `rgba(255, 220, 120, ${0.3 + pulse * 0.2})`);
+          gradient.addColorStop(0, `rgba(255, 220, 120, ${0.3 + pulse * 0.3})`);
           gradient.addColorStop(1, 'rgba(255, 220, 120, 0)');
           ctx.fillStyle = gradient;
           ctx.fill();
@@ -1287,47 +1287,13 @@ function drawPersonNode(
   // Routine Activity Tag / Icon for external persons
   if (p.isExternal && p.routine) {
     ctx.save();
-    if (isSelected) {
-      const label = `${p.routine.activityIcon} ${p.routine.activityLabel}`;
-      ctx.font = 'bold 9.5px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
-      const textWidth = ctx.measureText(label).width;
-      const tagW = textWidth + 16;
-      const tagH = 20;
-      const tagX = p.x - tagW / 2;
-      const tagY = p.y - radius - 26;
-
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.2;
+    // Stride walking indicator when traveling between zones
+    if (!p.routine.isDwelling) {
+      const strideBob = Math.sin((p.routine.walkPhase || 0)) * 2;
       ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(tagX, tagY, tagW, tagH, 4);
-      } else {
-        ctx.rect(tagX, tagY, tagW, tagH);
-      }
+      ctx.arc(p.x, p.y + radius + 4 + strideBob, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, p.x, tagY + tagH / 2);
-    } else {
-      // Crisp mini-badge above head indicating active routine
-      const badgeY = p.y - radius - 8;
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(p.routine.activityIcon, p.x, badgeY);
-
-      // Stride walking indicator when traveling between zones
-      if (!p.routine.isDwelling) {
-        const strideBob = Math.sin((p.routine.walkPhase || 0)) * 2;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y + radius + 4 + strideBob, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.fill();
-      }
     }
     ctx.restore();
   }
@@ -1340,9 +1306,9 @@ function drawPersonNode(
     : isSelected
     ? '#ffffff'
     : 'rgba(226, 232, 240, 0.9)';
-  const displayName = p.isExternal && p.routine?.personaTitle
-    ? `${p.name} (${p.routine.personaTitle})`
-    : p.name;
+  
+  // HK6-040: Routine Progressive Disclosure - Keep name only on main canvas
+  const displayName = p.name;
   ctx.fillText(displayName, p.x, p.y + radius + 12);
 
   ctx.restore();

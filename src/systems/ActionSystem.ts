@@ -9,19 +9,12 @@ import { DriftSystem } from './DriftSystem';
 
 export class ActionSystem {
   public actions: PlayerAction[];
-  public attention: number = 3.0;
-  public maxAttention: number = 3;
 
   constructor() {
     this.actions = initializeActions();
   }
 
   public update(dt: number): void {
-    // 1. Recharge attention (1 charge per 8 seconds = 0.125 / sec)
-    if (this.attention < this.maxAttention) {
-      this.attention = Math.min(this.maxAttention, this.attention + (1.0 / 8.0) * dt);
-    }
-
     // 2. Decrement action cooldowns
     for (const action of this.actions) {
       if (action.currentCooldown > 0) {
@@ -37,7 +30,7 @@ export class ActionSystem {
   public canUseAction(id: ActionId): boolean {
     const action = this.getAction(id);
     if (!action) return false;
-    return action.currentCooldown <= 0.05 && this.attention >= action.attentionCost;
+    return action.currentCooldown <= 0.05;
   }
 
   /**
@@ -61,12 +54,7 @@ export class ActionSystem {
       };
     }
 
-    if (this.attention < action.attentionCost) {
-      return { success: false, message: '행동력(시선 포인트)이 부족합니다.' };
-    }
-
-    // Consume attention and start cooldown
-    this.attention -= action.attentionCost;
+    // Start cooldown
     action.currentCooldown = action.cooldown;
 
     if (targetPerson) {
@@ -202,6 +190,9 @@ export class ActionSystem {
         targetPerson.stability = Math.min(100, targetPerson.stability + (wasLeaving ? 45 : 32));
         targetPerson.trust = Math.min(100, targetPerson.trust + (wasLeaving ? 30 : 15));
         targetPerson.leaveIntent = 0;
+        
+        // HK6-070: Player CARE provides temporary grace period, not permanent CARED state
+        targetPerson.careGraceTimer = 30;
         if (targetPerson.careStatus === 'UNCARED') targetPerson.careStatus = 'CARED';
         
         let shepherdAssistedMsg = '';
@@ -221,6 +212,7 @@ export class ActionSystem {
             nearbyUncared.stability = Math.min(100, nearbyUncared.stability + 25);
             nearbyUncared.trust = Math.min(100, nearbyUncared.trust + 20);
             nearbyUncared.leaveIntent = 0;
+            nearbyUncared.careGraceTimer = 30; // HK6-070
             nearbyUncared.careStatus = 'CARED';
             if (nearbyUncared.need) nearbyUncared.need = null;
             nearbyUncared.visualEffect = { type: 'CARE', timer: 4.0 };

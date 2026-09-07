@@ -34,7 +34,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   onSelectAction,
   onOpenSendModal,
 }) => {
-  const { attention, actions, communities, isReleaseActive, selectedPersonId, isPaused, gameSpeed } = engine.state;
+  const { actions, communities, isReleaseActive, selectedPersonId, isPaused, gameSpeed } = engine.state;
   const primaryComm = communities[0] || null;
 
   const togglePause = () => {
@@ -136,7 +136,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
     const action = actions.find(a => a.id === actionId);
     if (!action) return;
 
-    if (action.currentCooldown > 0.05 || attention < action.attentionCost) {
+    if (action.currentCooldown > 0.05) {
       return;
     }
 
@@ -162,51 +162,10 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
       className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 w-full max-w-5xl px-4 pointer-events-none flex flex-col gap-1.5 select-none"
     >
       <div className="w-full flex flex-col gap-1.5">
-        {/* Row 1: Attention (Left) and Priority (Right) */}
+        {/* Row 1: Left Spacer (for centering), Playback & Speed Controls, Priority (Right) */}
         <div className="w-full flex justify-between items-center pointer-events-auto bg-[#121212]/80 backdrop-blur-xl border border-white/10 rounded-full px-3 py-1.5 shadow-lg shadow-black/50">
-          {/* Left Wing: Attention Orbs (행동력) */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Tooltip
-              position="top"
-              content={
-                <div>
-                  <p className="font-bold text-amber-300">
-                    집중 (행동력): {Math.floor(attention)} / 3개
-                  </p>
-                  <p className="text-white/70 mt-0.5">
-                    사역을 집중할 수 있는 영적 에너지입니다. 8초마다 1개씩 회복됩니다.
-                  </p>
-                </div>
-              }
-            >
-              <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full cursor-help">
-                <span className="text-[10px] font-serif font-bold text-amber-300/80">
-                  집중
-                </span>
-                <div className="flex items-center gap-1">
-                  {[0, 1, 2].map(idx => {
-                    const filled = attention >= idx + 1;
-                    const fractional = !filled && attention > idx ? attention - idx : 0;
-                    return (
-                      <div
-                        key={idx}
-                        className="relative w-3.5 h-3.5 rounded-full border border-amber-400/50 bg-black/60 overflow-hidden flex items-center justify-center shadow-inner"
-                      >
-                        {filled ? (
-                          <div className="w-full h-full bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse-glow" />
-                        ) : fractional > 0 ? (
-                          <div
-                            className="absolute bottom-0 left-0 right-0 bg-amber-400/80 transition-all"
-                            style={{ height: `${fractional * 100}%` }}
-                          />
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Tooltip>
-          </div>
+          {/* Left Wing: Spacer for balance */}
+          <div className="w-[120px] shrink-0 hidden sm:block" />
 
           {/* Center: Playback & Speed Controls (일시정지, 1배속, 2배속, 최대 3배속) */}
           <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-1 gap-1 shadow-sm shrink-0">
@@ -409,8 +368,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
             const isSelected = activeActionId === act.id;
             const isOnCooldown = act.currentCooldown > 0.05;
-            const canAfford = attention >= act.attentionCost;
-            const isAvailable = !isOnCooldown && canAfford;
+            const isAvailable = !isOnCooldown;
 
             return (
               <Tooltip
@@ -420,14 +378,11 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   <div>
                     <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1 mb-1">
                       <span className="font-bold text-amber-300">{act.koreanName}</span>
-                      <span className="text-[10px] font-mono text-amber-400">
-                        비용: {act.attentionCost}●
-                      </span>
                     </div>
                     <p className="text-white/80 leading-tight">{act.description}</p>
                     {act.targetType === 'PERSON' && (
                       <p className="text-[10px] text-amber-200/70 mt-1 italic">
-                        * 지체 선택 후 클릭 또는 클릭 후 지체 탭
+                        * 사람 선택 후 클릭 또는 클릭 후 지체 탭
                       </p>
                     )}
                     {isOnCooldown && (
@@ -467,14 +422,6 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     {getActionShortName(act.id)}
                   </span>
 
-                  {/* Cost Pill */}
-                  <span
-                    className={`hidden sm:inline-block text-[9px] font-mono px-1 rounded-xs font-semibold shrink-0 ${
-                      isSelected ? 'bg-black/20 text-black' : 'text-amber-400/90'
-                    }`}
-                  >
-                    {act.attentionCost}●
-                  </span>
                 </button>
               </Tooltip>
             );

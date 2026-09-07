@@ -13,6 +13,7 @@ import {
   getNeedDetails,
   FAITH_STATS,
 } from '../utils/faithTerms';
+import { CallingSystem } from '../systems/CallingSystem';
 import { X, Sparkles, BookOpen, Heart, Flame, Shield, User, Award, Edit2, Send, HeartHandshake, MapPin } from 'lucide-react';
 
 interface PersonDetailModalProps {
@@ -217,7 +218,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
             <div className="bg-white/5 p-2.5 rounded-sm border border-white/10 flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-center text-[11px] font-serif mb-1.5">
-                  <span className="font-bold text-indigo-300">복음의 농도</span>
+                  <span className="font-bold text-indigo-300">깊이</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-xs font-bold border ${depthGrade.badge}`}>
                     {depthGrade.grade}
                   </span>
@@ -234,7 +235,28 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
                 </div>
               </div>
               <p className="text-[10px] text-indigo-200/60 mt-1.5 leading-tight font-sans">
-                말씀: 복음의 깊은 진리를 분별하고 뿌리내림
+                말씀: 복음의 진리를 분별하고 뿌리내림
+              </p>
+            </div>
+
+            {/* FORMATION (Discipleship) */}
+            <div className="bg-white/5 p-2.5 rounded-sm border border-white/10 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center text-[11px] font-serif mb-1.5">
+                  <span className="font-bold text-orange-300">양육 (형성도)</span>
+                  <span className={`text-[10px] font-mono font-bold text-orange-200`}>
+                    {Math.floor(person.formationProgress ?? 0)}%
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-white/10 rounded-xs flex overflow-hidden">
+                  <div
+                    className="h-full bg-orange-400 transition-all duration-700 ease-out"
+                    style={{ width: `${Math.min(100, person.formationProgress ?? 0)}%` }}
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-white/40 mt-1.5 leading-tight font-sans">
+                멘토: 근거리 관계를 통한 인격적 성숙
               </p>
             </div>
 
@@ -292,7 +314,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
             <div className="bg-white/5 p-2.5 rounded-sm border border-white/10 flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-center text-[11px] font-serif mb-1.5">
-                  <span className="font-bold text-amber-300">사역 헌신도</span>
+                  <span className="font-bold text-amber-300">준비도</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-xs font-bold border ${readinessGrade.badge}`}>
                     {readinessGrade.grade}
                   </span>
@@ -309,7 +331,7 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
                 </div>
               </div>
               <p className="text-[10px] text-white/40 mt-1.5 leading-tight font-sans">
-                헌신: 다른 지체를 품고 제자로 훈련받을 준비됨
+                준비: 다른 지체를 품고 훈련받을 준비됨
               </p>
             </div>
 
@@ -395,11 +417,17 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
                 (!person.calling) && onDiscoverCalling && (
                   <button
                     id="btn-discover-calling-auto"
-                    onClick={() => onDiscoverCalling(person.id)}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 px-2.5 py-1 rounded-sm transition-colors border border-amber-500/40 cursor-pointer shadow-sm"
+                    onClick={() => {
+                      onDiscoverCalling(person.id);
+                    }}
+                    className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-sm transition-colors border shadow-sm ${
+                      CallingSystem.isEligibleForCalling(person)
+                        ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border-amber-500/40 cursor-pointer'
+                        : 'bg-white/5 text-white/50 border-white/20 hover:bg-white/10 cursor-pointer'
+                    }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>은사 발견 (자동 추천)</span>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{CallingSystem.isEligibleForCalling(person) ? '역할 발견' : '역할 발견 (조건 미달)'}</span>
                   </button>
                 )
               )}
@@ -408,42 +436,23 @@ export const PersonDetailModal: React.FC<PersonDetailModalProps> = ({
             {isAutonomous ? (
               <div className="flex flex-col gap-2">
                 <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-xs p-2.5 text-[11px] text-emerald-200/90 leading-relaxed font-sans">
-                  <strong>'{community?.name}'</strong>은(는) 분립 개척된 독립 자율 공동체입니다. 사역 임명, 직분 오픈, 파송 등 모든 목양 정책은 현지 제자 리더십과 성령의 역사로 자율 운영되며, 모교회 플레이어의 인위적 통제권이 일절 없습니다.
+                  <strong>'{community?.name}'</strong>은(는) 파송된 독립 자율 공동체입니다. 사역 임명, 파송 등 모든 사역 정책은 다음 리더와 성령의 역사로 자율 운영되며, 모교회 플레이어의 인위적 통제권이 일절 없습니다.
                 </div>
                 {callingInfo ? (
                   <p className="text-[11px] text-amber-200/90 font-sans">
-                    현재 직분: <strong>{callingInfo.koreanName} ({callingInfo.symbol})</strong> · {callingInfo.strategicRole}
+                    현재 역할: <strong>{callingInfo.koreanName} ({callingInfo.symbol})</strong> · {callingInfo.strategicRole}
                   </p>
                 ) : (
                   <p className="text-[11px] text-white/50 font-sans">
-                    현지 공동체 내에서 말씀과 제자 양육 과정을 거쳐 자율적으로 은사가 발견됩니다.
+                    현지 공동체 내에서 깊이와 양육 과정을 거쳐 자율적으로 역할이 발견됩니다.
                   </p>
                 )}
               </div>
             ) : !person.calling ? (
               <div className="flex flex-col gap-2">
                 <p className="text-[11px] text-white/60 font-sans leading-relaxed">
-                  아직 사역 은사가 발견되지 않았습니다. 은사를 자동 발견하거나, 공동체에 필요한 직분을 직접 선택하여 사역자로 세울 수 있습니다:
+                  아직 역할이 발견되지 않았습니다. 깊이(68), 준비(68), 양육(70%)이 충족되면 역할을 발견할 수 있습니다.
                 </p>
-                {onDiscoverCalling && (
-                  <div className="grid grid-cols-5 gap-1.5 pt-1">
-                    {(['EVANGELIST', 'SHEPHERD', 'TEACHER', 'INTERCESSOR', 'WORSHIPPER'] as const).map(role => {
-                      const info = CALLING_DEFINITIONS[role];
-                      return (
-                        <button
-                          key={role}
-                          id={`btn-select-calling-${role.toLowerCase()}`}
-                          onClick={() => onDiscoverCalling(person.id, role)}
-                          className="flex flex-col items-center justify-center p-1.5 rounded-sm bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-400/50 text-center transition-all cursor-pointer group"
-                          title={`${info.koreanName}: ${info.strategicRole}`}
-                        >
-                          <span className="text-base mb-0.5 group-hover:scale-110 transition-transform">{info.symbol}</span>
-                          <span className="text-[10px] font-bold text-white/90 group-hover:text-amber-300 whitespace-nowrap">{info.koreanName}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             ) : (
               <div className="flex flex-col gap-2">

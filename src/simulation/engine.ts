@@ -35,6 +35,7 @@ import { DriftSystem, VulnerabilityAccumulator } from '../systems/DriftSystem';
 import { GenerationSystem } from '../systems/GenerationSystem';
 import { ReleaseSystem } from '../systems/ReleaseSystem';
 import { initializePersonRoutine } from '../systems/RoutineSystem';
+import { globalRNG } from '../utils/seededRNG';
 
 export interface Particle {
   id: string;
@@ -55,7 +56,6 @@ export interface GameEngineState {
   isReleaseActive: boolean;
   isGameOver: boolean;
 
-  attention: number; // 0-3
   maxAttention: number;
 
   particles: Particle[];
@@ -190,29 +190,21 @@ export class GameEngine {
   }
 
   public getExternalTargetCount(): number {
-    const mapId = this.mapSystem?.getMapProfile()?.id || 'CAMPUS';
-    if (mapId === 'COUNTRYSIDE') return 10;
-    if (mapId === 'CAMPUS') return 22;
-    if (mapId === 'DOWNTOWN') return 28;
-    return 16;
+    const mapProfile = this.mapSystem?.getMapProfile();
+    if (!mapProfile) return 22;
+    // HK6-030: Map Config Single Source
+    return Math.round(28 * mapProfile.populationDensity);
   }
 
   public getRandomAgeBand(): AgeBand {
-    const mapId = this.mapSystem?.getMapProfile()?.id || 'CAMPUS';
-    const roll = Math.random();
-    if (mapId === 'CAMPUS') {
-      if (roll < 0.70) return 'YOUNG';
-      if (roll < 0.95) return 'ADULT';
-      return 'SENIOR';
-    } else if (mapId === 'COUNTRYSIDE') {
-      if (roll < 0.60) return 'SENIOR';
-      if (roll < 0.90) return 'ADULT';
-      return 'YOUNG';
-    } else {
-      if (roll < 0.65) return 'ADULT';
-      if (roll < 0.90) return 'YOUNG';
-      return 'SENIOR';
-    }
+    const mapProfile = this.mapSystem?.getMapProfile();
+    if (!mapProfile) return 'ADULT';
+
+    // HK6-030: Single Source of Truth for Age Profile
+    return globalRNG.weightedChoice<AgeBand>(
+      ['YOUNG', 'ADULT', 'SENIOR'],
+      [mapProfile.ageProfile.young, mapProfile.ageProfile.adult, mapProfile.ageProfile.senior]
+    );
   }
 
   private createInitialState(targetMapId?: MapId): GameEngineState {
@@ -388,7 +380,6 @@ export class GameEngine {
       gameSpeed: 1,
       isReleaseActive: false,
       isGameOver: false,
-      attention: 3.0,
       maxAttention: 3,
       particles: [],
       mapId: effectiveMapId,
@@ -461,7 +452,6 @@ export class GameEngine {
 
     // 1. Update Action System & Attention
     this.actionSystem.update(dt);
-    this.state.attention = this.actionSystem.attention;
     this.state.actions = this.actionSystem.actions;
 
     // Update Particles
@@ -598,10 +588,30 @@ export class GameEngine {
       // HK5-100: Discipleship Formation Accumulation
       if (!person.isExternal && person.communityId && !person.calling && !person.isMatureDisciple) {
         if (!person.formationMentorId) {
-          const possibleMentor = this.state.people.find(
-            p => p.communityId === person.communityId && p.id !== person.id && (p.calling !== null || p.isMatureDisciple)
-          );
-          if (possibleMentor) person.formationMentorId = possibleMentor.id;
+          // HK6-090: Formation Mentor Relational Resolver
+          let mentor: Person | null = null;
+          if (person.caregiverId) {
+            mentor = this.state.people.find(p => p.id === person.caregiverId && (p.calling !== null || p.isMatureDisciple)) || null;
+          }
+          if (!mentor && person.contactWithId) {
+            mentor = this.state.people.find(p => p.id === person.contactWithId && (p.calling !== null || p.isMatureDisciple)) || null;
+          }
+          if (!mentor && person.beingHeldById) {
+            mentor = this.state.people.find(p => p.id === person.beingHeldById && (p.calling !== null || p.isMatureDisciple)) || null;
+          }
+          if (!mentor) {
+            let minDistance = Infinity;
+            for (const other of this.state.people) {
+              if (other.communityId === person.communityId && other.id !== person.id && (other.calling !== null || other.isMatureDisciple)) {
+                const d = Math.hypot(person.x - other.x, person.y - other.y);
+                if (d < minDistance) {
+                  minDistance = d;
+                  mentor = other;
+                }
+              }
+            }
+          }
+          if (mentor) person.formationMentorId = mentor.id;
         }
 
         if (person.formationMentorId) {
@@ -1045,16 +1055,20 @@ export class GameEngine {
       return false;
     }
 
-    // HK5-010: Strict Calling Discovery Gate
-    // Autonomous check: Requires Word depth, readiness, and discipleship formation
-    if (!forceManual && !CallingSystem.isEligibleForCalling(person)) {
-      this.logEvent(`${person.name} 성도는 아직 말씀 양육과 제자 훈련(기준: 말씀 68, 헌신 68, 양육 70%)이 더 필요합니다.`, 'WARNING');
-      return false;
+    // HK6-001: Strict Calling Discovery Gate (Single Source of Truth)
+    // Applies to autonomous calls strictly. If manual, allow it to bypass but warn.
+    if (!CallingSystem.isEligibleForCalling(person)) {
+      if (forceManual) {
+        this.logEvent(`[수동 개입] ${person.name}님의 준비(깊이/준비도/양육)가 부족하지만, 강제로 역할을 부여합니다.`, 'WARNING');
+      } else {
+        return false;
+      }
     }
 
-    // TASK HK4-130: Relational Mentor Selection (caregiver -> direct interaction/holding -> nearest mature leader)
-    let mentor: Person | null = null;
-    if (person.caregiverId) {
+    // HK6-090: Mentor Resolver Integration
+    let mentor: Person | null = person.formationMentorId ? (this.state.people.find(p => p.id === person.formationMentorId) || null) : null;
+    
+    if (!mentor && person.caregiverId) {
       mentor = this.state.people.find(p => p.id === person.caregiverId && p.calling !== null) || null;
     }
     if (!mentor && person.contactWithId) {
@@ -1166,7 +1180,6 @@ export class GameEngine {
     );
 
     if (result.success) {
-      this.state.attention = this.actionSystem.attention;
       this.state.actions = this.actionSystem.actions;
       soundEngine.playCardUse();
       this.logEvent(result.message, 'BLESSING');

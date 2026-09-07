@@ -101,6 +101,7 @@ export interface Person {
   
   // Care System (Section 16-22)
   careStatus: CareStatus;
+  careGraceTimer?: number;  // HK6-070: Temporary grace period from Player CARE
   caregiverId?: string;
   careTargets?: string[];   // For Shepherds (up to 4) & Mature disciples (1)
   careCapacity?: number;    // 4 for Shepherd, 1 for Mature disciple
@@ -255,7 +256,6 @@ export interface PlayerAction {
   description: string;
   cooldown: number;        // total cooldown in seconds (data-driven)
   currentCooldown: number; // remaining cooldown (0 = READY)
-  attentionCost: number;   // 1 or 2
   icon: string;
   targetType: 'PERSON' | 'ANY' | 'STRATEGIC';
 }

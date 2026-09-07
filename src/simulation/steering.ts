@@ -85,7 +85,7 @@ export function calculatePersonSteering(
   // 1. Separation force (avoid overlapping with neighbors)
   // For dwelling external people, we use gentle, cozy separation so companions can sit at tables together!
   const isDwelling = person.isExternal && person.routine?.isDwelling;
-  const separationRadius = isDwelling ? 18 : (person.isExternal ? 24 : 32);
+  const separationRadius = isDwelling ? 24 : (person.isExternal ? 32 : 44);
   let sepX = 0;
   let sepY = 0;
   let sepCount = 0;
@@ -95,7 +95,7 @@ export function calculatePersonSteering(
     const d = distance(person.x, person.y, other.x, other.y);
     if (d > 0 && d < separationRadius) {
       const push = (separationRadius - d) / separationRadius;
-      const pushMult = isDwelling ? 24 : (person.isExternal ? 45 : 90);
+      const pushMult = isDwelling ? 36 : (person.isExternal ? 75 : 150);
       sepX += ((person.x - other.x) / d) * push * pushMult;
       sepY += ((person.y - other.y) / d) * push * pushMult;
       sepCount++;
@@ -283,11 +283,12 @@ export function calculatePersonSteering(
     // Generic believers DO NOT actively seek outside; they only engage in close incidental relationships.
     // GO priority widens incidental range for generic believers and supercharges Evangelists.
     const contactRange = isEvangelist ? (commPriority === 'GO' ? 52 : 44) : (commPriority === 'GO' ? 26 : 18);
+    const maxSeekers = isEvangelist ? 2 : 1;
 
-    // Acquire new seeker targets up to the strict limit of 2 concurrent markings
-    if (person.engagedSeekerIds.length < 2) {
+    // Acquire new seeker targets up to the strict limit
+    if (person.engagedSeekerIds.length < maxSeekers) {
       for (const other of allPeople) {
-        if (person.engagedSeekerIds.length >= 2) break;
+        if (person.engagedSeekerIds.length >= maxSeekers) break;
         if (
           other.isExternal &&
           other.externalState !== 'CONTACTED' &&

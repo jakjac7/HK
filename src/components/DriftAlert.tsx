@@ -26,24 +26,24 @@ export const DriftAlert: React.FC<DriftAlertProps> = ({ communities }) => {
 
         let borderClass = 'border-l-4 border-amber-400 text-amber-200';
         let Icon = AlertCircle;
-        let remedyAction = '말씀(WORD) 또는 사역';
+        let remedyAction = '생명력이 시들고 있습니다';
 
         if (isDeception) {
           borderClass = drift.discovered
             ? 'border-l-4 border-indigo-400 text-indigo-200'
             : 'border-l-4 border-purple-400 text-purple-200';
           Icon = Eye;
-          remedyAction = drift.discovered ? '말씀(WORD) 선포 필요' : '교사의 분별 진행 중';
+          remedyAction = drift.discovered ? '진리로 분별하십시오' : '거짓 사상 유입 중';
         } else if (isDivision) {
           borderClass = 'border-l-4 border-rose-500 text-rose-200';
           Icon = ShieldAlert;
-          remedyAction = '식탁 교제(FELLOWSHIP) 필요';
+          remedyAction = '관계가 갈라지고 있습니다';
         } else if (isBurnout) {
           borderClass = 'border-l-4 border-amber-500 text-amber-200';
           Icon = AlertCircle;
-          remedyAction = '심방(CARE) 및 기도(PRAYER) 필요';
+          remedyAction = '돌봄과 쉼이 필요합니다';
         } else {
-          remedyAction = '예배(WORSHIP) 및 선교(GO) 필요';
+          remedyAction = '생명력이 시들고 있습니다';
         }
 
         return (
