@@ -7,6 +7,8 @@ export type CallingType = 'EVANGELIST' | 'SHEPHERD' | 'TEACHER' | 'INTERCESSOR' 
 
 export type Generation = 0 | 1 | 2 | 3;
 
+export type AgeBand = 'YOUNG' | 'ADULT' | 'SENIOR';
+
 export type PersonMovementState =
   | 'INSIDE'
   | 'EDGE'
@@ -39,6 +41,31 @@ export type ExternalPersonState =
   | 'CONTACTED'
   | 'FOLLOWING'
   | 'ENTERING';
+
+export type RoutineStage = 'RESIDENCE' | 'WORK_CAMPUS' | 'CAFE' | 'TRANSIT';
+
+export type PersonaType = 'STUDENT' | 'RESEARCHER' | 'JOB_SEEKER' | 'PROFESSIONAL' | 'RESIDENT';
+
+export interface LifeRoutine {
+  stage: RoutineStage;
+  targetZoneId: string;
+  targetZoneName: string;
+  targetX: number;
+  targetY: number;
+  isDwelling: boolean; // true = reached destination and doing activity there; false = walking to destination
+  timer: number; // remaining seconds in current state
+  dwellDuration: number; // 12 ~ 32 seconds
+  activityLabel: string; // e.g. '청년 카페거리 테라스에서 친구와 대화', '캠퍼스 중앙도서관 열람실 열공'
+  activityIcon: string; // '🏡', '📚', '☕', '🚇'
+  cycleSchedule: RoutineStage[];
+  cycleIndex: number;
+  personalOffset: { x: number; y: number }; // natural spread within zone
+  persona: PersonaType;
+  personaTitle: string; // e.g. '대학생', '연구원', '취준생', '청년 직장인', '동네 청년'
+  spotName: string; // e.g. '테라스 창가석', '도서관 3열람실', '기숙사 휴게실', '중앙역 시계탑 앞'
+  partnerId?: string | null; // ID of neighbor currently conversing with
+  walkPhase: number; // Walking stride animation phase
+}
 
 export interface PersonNeed {
   type: NeedType;
@@ -80,10 +107,16 @@ export interface Person {
   careLoad?: number;        // careTargets.length
   leaveIntent?: number;     // 0-100 (rises if UNCARED)
 
-  // Real Lineage (Section 41-42)
+  // Real Lineage & Discipleship Formation (HK5-100)
   trainedById?: string;
   parentLeaderId?: string;
+  formationMentorId?: string;
+  formationProgress?: number; // 0-100 (Discipleship maturity progression)
   isMatureDisciple?: boolean;
+  ageBand?: AgeBand; // HK5-051 Map-driven age profile
+
+  // Daily life routine & Patterned movement (주거지, 카페거리, 대학/직장, 환승구 등)
+  routine?: LifeRoutine;
 
   need: PersonNeed | null;
   
@@ -111,6 +144,7 @@ export interface Person {
   isHoldingPersonId?: string | null; // ID of the member this shepherd is holding
   holdingTimer?: number; // Visual holding animation/embrace timer
   leavingTimer?: number; // Grace period countdown before leaving (gives shepherd time to reach)
+  leavingReason?: string; // Reason for leaving crisis (e.g. 취업·이직, 결혼, 유학, 관계 갈등 등)
   
   // Sending state
   isBeingSent?: boolean;
@@ -209,6 +243,7 @@ export interface Community {
   currentRadius: number;
   isIndependent?: boolean;
   isAutonomous?: boolean; // Fully self-governing planted daughter church
+  lastWorshipPulse?: number; // HK5-040: Timestamp of worshipper gathering pulse
 }
 
 export type ActionId = 'FELLOWSHIP' | 'WORD' | 'PRAYER' | 'WORSHIP' | 'CARE' | 'SEND';

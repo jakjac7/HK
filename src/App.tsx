@@ -17,7 +17,10 @@ import { TutorialGuideModal } from './components/TutorialGuideModal';
 import { TitleScreen } from './components/TitleScreen';
 import { SocietalNewsTicker } from './components/SocietalNewsTicker';
 import { WordSeedToast } from './components/WordSeedToast';
+import { CrisisInterventionBanner } from './components/CrisisInterventionBanner';
 import { Person, CallingType, ActionId, MapId } from './types';
+import { getCallingLabel } from './utils/faithTerms';
+import { Send, Sparkles, HeartHandshake } from 'lucide-react';
 
 export default function App() {
   // Central Game Engine instance
@@ -35,10 +38,35 @@ export default function App() {
   const [activeActionId, setActiveActionId] = useState<ActionId | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState<boolean>(false);
+  const [preSelectedLeaderId, setPreSelectedLeaderId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [dismissResultScreen, setDismissResultScreen] = useState<boolean>(false);
   const [isWordToastVisible, setIsWordToastVisible] = useState<boolean>(false);
   const wordToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [callingToast, setCallingToast] = useState<{
+    personName: string;
+    calling: CallingType;
+  } | null>(null);
+  const callingToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [focusedPersonId, setFocusedPersonId] = useState<string | null>(null);
+
+  // Pastoral rescue for leaving/troubled believer
+  const handleRescuePerson = useCallback((personId: string) => {
+    const result = engine.rescuePerson(personId);
+    if (result.success) {
+      setTick(t => t + 1);
+      const fresh = engine.state.people.find(p => p.id === personId);
+      if (fresh) setSelectedPerson({ ...fresh });
+    }
+  }, [engine]);
+
+  // Center camera and select person
+  const handleFocusPerson = useCallback((personId: string) => {
+    setFocusedPersonId(personId);
+    const person = engine.state.people.find(p => p.id === personId);
+    if (person) setSelectedPerson({ ...person });
+    setTimeout(() => setFocusedPersonId(null), 1000);
+  }, [engine]);
 
   // Trigger graceful toast notification when Word is proclaimed
   const triggerWordToast = useCallback(() => {
@@ -51,15 +79,30 @@ export default function App() {
     }, 2800);
   }, []);
 
+  const triggerCallingToast = useCallback((person: Person, calling: CallingType) => {
+    if (callingToastTimerRef.current) {
+      clearTimeout(callingToastTimerRef.current);
+    }
+    setCallingToast({ personName: person.name, calling });
+    callingToastTimerRef.current = setTimeout(() => {
+      setCallingToast(null);
+    }, 4500);
+  }, []);
+
   useEffect(() => {
     engine.onWordProclaimed = triggerWordToast;
+    engine.onCallingDiscovered = triggerCallingToast;
     return () => {
       engine.onWordProclaimed = undefined;
+      engine.onCallingDiscovered = undefined;
       if (wordToastTimerRef.current) {
         clearTimeout(wordToastTimerRef.current);
       }
+      if (callingToastTimerRef.current) {
+        clearTimeout(callingToastTimerRef.current);
+      }
     };
-  }, [engine, triggerWordToast]);
+  }, [engine, triggerWordToast, triggerCallingToast]);
 
   // Sync state for UI counters (5 times a second is smooth and CPU-friendly)
   useEffect(() => {
@@ -84,23 +127,23 @@ export default function App() {
     setHasStarted(true);
   }, [engine]);
 
-  const handleDiscoverCalling = useCallback((personId: string) => {
+  const handleDiscoverCalling = useCallback((personId: string, specificCalling?: CallingType) => {
     const person = engine.state.people.find(p => p.id === personId);
     if (!person || !person.communityId) return;
     const comm = engine.state.communities.find(c => c.id === person.communityId);
     if (!comm) return;
 
-    engine.triggerCallingDiscovery(person, comm);
-    setTick(t => t + 1);
-    
-    // Also update selectedPerson if it's the currently selected one
-    if (selectedPerson && selectedPerson.id === personId) {
+    const success = engine.triggerCallingDiscovery(person, comm, true, specificCalling);
+    if (success) {
+      setTick(t => t + 1);
+      
+      // Also update selectedPerson if it's the currently selected one
       const fresh = engine.state.people.find(p => p.id === personId);
       if (fresh) {
         setSelectedPerson({ ...fresh });
       }
     }
-  }, [engine, selectedPerson]);
+  }, [engine]);
 
   // Handle action selection & auto-play for community-wide actions (Section 5)
   const handleSelectAction = useCallback(
@@ -189,12 +232,16 @@ export default function App() {
   }
 
   return (
-    <div className="fixed inset-0 w-full h-[100dvh] overflow-hidden flex flex-col bg-slate-950 select-none">
+    <div className="fixed inset-0 w-full h-full max-h-screen overflow-hidden flex flex-col bg-slate-950 select-none overscroll-none">
       {/* Top HUD */}
       <TopHUD
         engine={engine}
         onOpenGuide={() => setIsGuideOpen(true)}
         onTriggerRelease={handleTriggerRelease}
+        onOpenSendModal={() => {
+          setPreSelectedLeaderId(null);
+          setIsSendModalOpen(true);
+        }}
         isMuted={isMuted}
         setIsMuted={setIsMuted}
       />
@@ -202,30 +249,57 @@ export default function App() {
       {/* Word of Life Seed Toast Notification */}
       <WordSeedToast visible={isWordToastVisible} />
 
-      {/* Societal News Ticker (시대의 징후 뉴스 예고 및 경보) */}
-      <SocietalNewsTicker
-        news={engine.state.societalNews}
-        onDismiss={() => {
-          engine.state.societalNews = null;
-        }}
-      />
-
-      {/* Real-time Drift Alerts */}
-      <DriftAlert 
-        communities={engine.state.communities} 
-        onResolveDrift={(commId, type) => {
-          engine.resolveDriftManual(commId, type);
-        }}
-      />
-
       {/* Main Interactive Organic Simulation Canvas */}
       <main className="relative flex-1 w-full h-full min-h-0 overflow-hidden">
+        {/* Top Alert Center (상단 알람 중앙 수직 배치 - 2줄 HUD 바로 아래에 안정적으로 위치) */}
+        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-35 w-[94%] max-w-2xl flex flex-col gap-2 pointer-events-none items-center">
+          {/* Calling Discovery Toast Notification */}
+          {callingToast && (
+            <div className="w-full max-w-lg pointer-events-auto transition-all duration-300">
+              <div className="bg-[#18181B]/95 border border-amber-400/70 px-4 py-2.5 rounded shadow-2xl backdrop-blur flex items-center gap-3 ring-1 ring-amber-400/40 animate-bounce">
+                <span className="text-xl">✨</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-300 text-xs font-bold font-serif whitespace-nowrap">은사 발견 및 사역자 세움</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-200 border border-amber-400/40 font-bold whitespace-nowrap">
+                      {getCallingLabel(callingToast.calling)}
+                    </span>
+                  </div>
+                  <p className="text-white/90 text-xs mt-0.5">
+                    <strong className="text-white font-bold">{callingToast.personName}</strong> 성도님이{' '}
+                    <strong className="text-amber-300">{getCallingLabel(callingToast.calling)}</strong> 직분으로 기름부으심을 받았습니다!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Real-time Crisis Intervention Banner (이탈 위기 지체 긴급 붙잡기) */}
+          <CrisisInterventionBanner
+            engine={engine}
+            onFocusPerson={handleFocusPerson}
+            onRescuePerson={handleRescuePerson}
+          />
+
+          {/* Societal News Ticker (시대의 징후 뉴스 예고 및 경보) */}
+          <SocietalNewsTicker
+            news={engine.state.societalNews}
+            onDismiss={() => {
+              engine.state.societalNews = null;
+            }}
+          />
+
+          {/* Real-time Drift Alerts */}
+          <DriftAlert communities={engine.state.communities} />
+        </div>
+
         <SimulationCanvas
           engine={engine}
           onSelectPerson={setSelectedPerson}
           selectedPersonId={selectedPerson?.id || null}
           activeActionId={activeActionId}
           onApplyActionOnPerson={handleApplyActionOnPerson}
+          focusedPersonId={focusedPersonId}
         />
 
         {/* Selected Person Floating Quick UI (anchored to canvas area above bottom bar) */}
@@ -236,6 +310,18 @@ export default function App() {
               <button onClick={() => setSelectedPerson(null)} className="text-white/40 hover:text-white/80 cursor-pointer"><span className="text-xs">✕</span></button>
             </div>
             
+            {/* Urgent LEAVING quick rescue button */}
+            {selectedPerson.movementState === 'LEAVING' && (
+              <button 
+                id="btn-quick-rescue-person"
+                onClick={() => handleRescuePerson(selectedPerson.id)}
+                className="w-full bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-bold py-1.5 rounded-sm text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(244,63,94,0.4)] animate-pulse mb-1 border border-rose-400"
+              >
+                <HeartHandshake className="w-4 h-4 text-white" />
+                <span>지체 붙잡기 ({selectedPerson.leavingReason || '이탈 위기'})</span>
+              </button>
+            )}
+
             <div className="w-full flex flex-col gap-1.5 text-[10px] font-sans">
               <div className="flex justify-between items-center text-violet-300">
                 <span>성령충만</span>
@@ -267,10 +353,25 @@ export default function App() {
             </div>
             {(!selectedPerson.calling && !selectedPerson.isExternal) && (
               <button 
+                id="btn-quick-discover-calling"
                 onClick={() => handleDiscoverCalling(selectedPerson.id)}
-                className="w-full bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 py-1.5 rounded-sm text-xs transition-colors mt-1 cursor-pointer"
+                className="w-full bg-gradient-to-r from-amber-500/25 to-yellow-500/25 text-amber-300 hover:from-amber-500/35 hover:to-yellow-500/35 border border-amber-500/40 py-1.5 rounded-sm text-xs font-semibold transition-all mt-1 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
               >
-                은사 발견 (사역 시작)
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>은사 발견 (사역 시작)</span>
+              </button>
+            )}
+            {selectedPerson.calling && !selectedPerson.isExternal && !selectedPerson.isBeingSent && (
+              <button 
+                id="btn-quick-send-leader"
+                onClick={() => {
+                  setPreSelectedLeaderId(selectedPerson.id);
+                  setIsSendModalOpen(true);
+                }}
+                className="w-full bg-gradient-to-r from-amber-400/25 via-yellow-500/25 to-amber-500/25 text-amber-300 hover:from-amber-400/40 hover:to-yellow-500/40 border border-amber-400/50 py-1.5 rounded-sm text-xs font-bold transition-all mt-1 cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(251,191,36,0.25)]"
+              >
+                <Send className="w-3.5 h-3.5 text-amber-300" />
+                <span>선교지 파송 (교회 개척)</span>
               </button>
             )}
           </div>
@@ -285,7 +386,10 @@ export default function App() {
         engine={engine}
         activeActionId={activeActionId}
         onSelectAction={handleSelectAction}
-        onOpenSendModal={() => setIsSendModalOpen(true)}
+        onOpenSendModal={() => {
+          setPreSelectedLeaderId(null);
+          setIsSendModalOpen(true);
+        }}
       />
 
       {/* Person Detail & Discipleship Modal */}
@@ -296,6 +400,11 @@ export default function App() {
             setShowPersonDetail(false);
           }}
           onDiscoverCalling={handleDiscoverCalling}
+          onSendLeader={leaderId => {
+            setPreSelectedLeaderId(leaderId);
+            setIsSendModalOpen(true);
+          }}
+          onRescuePerson={handleRescuePerson}
         />
       )}
 
@@ -303,7 +412,11 @@ export default function App() {
       {isSendModalOpen && (
         <SendModal
           engine={engine}
-          onClose={() => setIsSendModalOpen(false)}
+          initialLeaderId={preSelectedLeaderId}
+          onClose={() => {
+            setIsSendModalOpen(false);
+            setPreSelectedLeaderId(null);
+          }}
           onSend={handleSendLeader}
         />
       )}

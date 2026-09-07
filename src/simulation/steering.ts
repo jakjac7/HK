@@ -5,6 +5,7 @@
 
 import { Person, Community, CommunityPriority, MapProfile } from '../types';
 import { MapSystem } from '../systems/MapSystem';
+import { updatePersonRoutine } from '../systems/RoutineSystem';
 
 export interface WorldBounds {
   width: number;
@@ -31,7 +32,7 @@ export function calculatePersonSteering(
   world: WorldBounds,
   dt: number,
   isReleaseActive: boolean,
-  isSunday: boolean = false,
+  worshipGatheringCommId?: string | null,
   mapProfile?: MapProfile,
   mapSystem?: MapSystem
 ): { fx: number; fy: number; maxSpeed: number } {
@@ -41,6 +42,13 @@ export function calculatePersonSteering(
   // Max speed affected by burnout
   const burnoutPenalty = 1 - (person.burnout / 100) * 0.55;
   let maxSpeed = (person.isExternal ? 28 : 42) * burnoutPenalty;
+
+  // HK5-051: AgeBand speed modifiers
+  if (person.ageBand === 'YOUNG') {
+    maxSpeed *= 1.12;
+  } else if (person.ageBand === 'SENIOR') {
+    maxSpeed *= 0.88;
+  }
 
   // TASK HK4-010: Map Mobility Integration
   const mobility = mapProfile?.mobility ?? 1.0;
@@ -75,7 +83,9 @@ export function calculatePersonSteering(
   const commPriority: CommunityPriority = comm ? comm.priority : 'ROOT';
 
   // 1. Separation force (avoid overlapping with neighbors)
-  const separationRadius = 32; // Increased to prevent too much overlap
+  // For dwelling external people, we use gentle, cozy separation so companions can sit at tables together!
+  const isDwelling = person.isExternal && person.routine?.isDwelling;
+  const separationRadius = isDwelling ? 18 : (person.isExternal ? 24 : 32);
   let sepX = 0;
   let sepY = 0;
   let sepCount = 0;
@@ -85,8 +95,9 @@ export function calculatePersonSteering(
     const d = distance(person.x, person.y, other.x, other.y);
     if (d > 0 && d < separationRadius) {
       const push = (separationRadius - d) / separationRadius;
-      sepX += ((person.x - other.x) / d) * push * 90; // Increased push force
-      sepY += ((person.y - other.y) / d) * push * 90;
+      const pushMult = isDwelling ? 24 : (person.isExternal ? 45 : 90);
+      sepX += ((person.x - other.x) / d) * push * pushMult;
+      sepY += ((person.y - other.y) / d) * push * pushMult;
       sepCount++;
     }
   }
@@ -109,35 +120,120 @@ export function calculatePersonSteering(
 
   // 3. External Person autonomous behavior
   if (person.isExternal) {
-    if (person.externalState === 'FOLLOWING' && person.contactWithId) {
-      const guide = allPeople.find(p => p.id === person.contactWithId);
-      if (guide) {
-        const d = distance(person.x, person.y, guide.x, guide.y);
-        if (d > 35) {
-          // Follow guide toward community
-          fx += ((guide.x - person.x) / d) * 45;
-          fy += ((guide.y - person.y) / d) * 45;
+    if (person.externalState === 'CONTACTED' || person.externalState === 'FOLLOWING' || person.externalState === 'ENTERING') {
+      // The soul has decided to visit the church community on their own!
+      // Walks peacefully and directly toward the community center (does NOT trail behind evangelist)
+      const targetComm = communities.find(c => c.id === person.communityId) || communities[0];
+      if (targetComm) {
+        const d = distance(person.x, person.y, targetComm.centerX, targetComm.centerY);
+        if (d > 10) {
+          const desiredSpeed = 46;
+          const nx = (targetComm.centerX - person.x) / d;
+          const ny = (targetComm.centerY - person.y) / d;
+          fx += (nx * desiredSpeed - person.vx) * 2.8;
+          fy += (ny * desiredSpeed - person.vy) * 2.8;
         }
       }
+      if (person.routine) {
+        person.routine.activityLabel = '복음의 초대를 받아 공동체로 향함';
+        person.routine.activityIcon = '✝️';
+      }
     } else {
-      // Gentle curiosity wander outside
-      const wanderAngle = (person.wobbleOffset + performance.now() * 0.001) % (Math.PI * 2);
-      fx += Math.cos(wanderAngle) * 14;
-      fy += Math.sin(wanderAngle) * 14;
+      // Patterned Daily Life Movement: 주거지(기숙사), 대학/연구실, 청년 카페거리, 환승역 등
+      if (mapSystem) {
+        updatePersonRoutine(person, mapSystem, world.width, world.height, dt, allPeople);
+      }
 
-      // Gentle decay of contactProgress if not contacted yet and no believers near
-      if (person.externalState !== 'CONTACTED' && (person.contactProgress || 0) > 0) {
-        const anyBelieverNear = allPeople.some(p => !p.isExternal && distance(p.x, p.y, person.x, person.y) < 35);
-        if (!anyBelieverNear) {
-          person.contactProgress = Math.max(0, (person.contactProgress || 0) - 3 * dt);
+      if (person.routine) {
+        if (!person.routine.isDwelling) {
+          // PURPOSEFULLY WALKING TOWARD DESTINATION LANDMARK
+          const dx = person.routine.targetX - person.x;
+          const dy = person.routine.targetY - person.y;
+          const d = Math.hypot(dx, dy);
+
+          if (d > 10) {
+            const nx = dx / d;
+            const ny = dy / d;
+
+            // Natural human walking speed: 54 ~ 66 px/s
+            const baseWalkSpeed = 58;
+
+            // Subtle natural walking stride sway
+            const walkPhase = person.routine.walkPhase || 0;
+            const sway = Math.sin(walkPhase) * 5;
+
+            const desiredVx = nx * baseWalkSpeed - ny * sway;
+            const desiredVy = ny * baseWalkSpeed + nx * sway;
+
+            fx += (desiredVx - person.vx) * 3.4;
+            fy += (desiredVy - person.vy) * 3.4;
+
+            // Church sanctuary avoidance: Gracefully bypass church perimeter along the street
+            for (const c of communities) {
+              const dToChurch = distance(person.x, person.y, c.centerX, c.centerY);
+              const avoidRadius = c.currentRadius * 0.95;
+              if (dToChurch < avoidRadius && dToChurch > 0) {
+                const awayX = (person.x - c.centerX) / dToChurch;
+                const awayY = (person.y - c.centerY) / dToChurch;
+                const tangX = -awayY;
+                const tangY = awayX;
+                const dot = tangX * nx + tangY * ny;
+                const sign = dot >= 0 ? 1 : -1;
+                const urgency = (avoidRadius - dToChurch) / avoidRadius;
+                fx += (awayX * 65 + tangX * sign * 50) * urgency;
+                fy += (awayY * 65 + tangY * sign * 50) * urgency;
+              }
+            }
+          }
+        } else {
+          // CALMLY DWELLING AT DESTINATION SPOT (Cafe table, campus desk, dorm room, station lounge)
+          const dFromSpot = distance(person.x, person.y, person.routine.targetX, person.routine.targetY);
+          if (dFromSpot > 4) {
+            const pull = Math.min(1, dFromSpot / 18);
+            fx += ((person.routine.targetX - person.x) / dFromSpot) * 36 * pull;
+            fy += ((person.routine.targetY - person.y) / dFromSpot) * 36 * pull;
+          }
+
+          // Damping while resting/dwelling so they look at peace and don't jitter
+          person.vx *= 0.84;
+          person.vy *= 0.84;
+
+          // Conversational proximity if sharing spot with social partner
+          if (person.routine.partnerId) {
+            const partner = allPeople.find(p => p.id === person.routine?.partnerId);
+            if (partner) {
+              const dP = distance(person.x, person.y, partner.x, partner.y);
+              if (dP > 22 && dP < 40) {
+                fx += ((partner.x - person.x) / dP) * 10;
+                fy += ((partner.y - person.y) / dP) * 10;
+              }
+            }
+          }
         }
+      }
+
+      // If engaged by a believer / evangelist nearby, pause and converse!
+      const anyBelieverNear = allPeople.some(
+        p => !p.isExternal && (p.engagedSeekerIds?.includes(person.id) || distance(p.x, p.y, person.x, person.y) < 36)
+      );
+      if (anyBelieverNear || (person.contactProgress || 0) > 0) {
+        fx *= 0.22;
+        fy *= 0.22;
+        person.vx *= 0.72;
+        person.vy *= 0.72;
+      }
+
+      // Gentle decay of contactProgress if not contacted yet and no believers actively visiting
+      if ((person.contactProgress || 0) > 0 && !anyBelieverNear) {
+        person.contactProgress = Math.max(0, (person.contactProgress || 0) - 2.5 * dt);
       }
     }
 
     // Keep within world bounds
     fx += getBoundaryPush(person.x, person.y, world).bx;
     fy += getBoundaryPush(person.x, person.y, world).by;
-    return { fx, fy, maxSpeed: maxSpeed * 0.7 };
+    const speedMult = (person.routine && !person.routine.isDwelling) ? 1.15 : 0.45;
+    return { fx, fy, maxSpeed: maxSpeed * speedMult };
   }
 
   // 4. Community Member Steering
@@ -156,21 +252,13 @@ export function calculatePersonSteering(
       targetCenterX = comm.centerX + (hash === 0 ? -commRadius * 0.55 : commRadius * 0.55);
     }
 
-    // SUNDAY SCRUM: Everyone gathers tightly to the center to worship
-    if (isSunday && !isDivided) {
-      if (distToCenter > 15) {
-        fx += ((targetCenterX - person.x) / distToCenter) * 60;
-        fy += ((targetCenterY - person.y) / distToCenter) * 60;
+    // HK5-040: Worshipper-driven Gathering Pulse (Replaces artificial Sunday Scrum)
+    // When a Worshipper actively pulses, members experience a gentle harmonious pull inward
+    if (worshipGatheringCommId === comm.id && !isDivided) {
+      if (distToCenter > 18) {
+        fx += ((targetCenterX - person.x) / distToCenter) * 32;
+        fy += ((targetCenterY - person.y) / distToCenter) * 32;
       }
-      // Add slight rotation for scrum effect
-      fx += (- (targetCenterY - person.y) / distToCenter) * 15;
-      fy += ((targetCenterX - person.x) / distToCenter) * 15;
-      
-      // World bounds containment
-      const { bx, by } = getBoundaryPush(person.x, person.y, world);
-      fx += bx;
-      fy += by;
-      return { fx, fy, maxSpeed };
     }
 
     // =========================================================================
@@ -191,12 +279,13 @@ export function calculatePersonSteering(
     });
 
     const isEvangelist = person.calling === 'EVANGELIST';
-    // TASK HK4-100: Evangelists (or believers when Priority is GO) actively seek external people
-    const canEngageSeekers = isEvangelist || commPriority === 'GO';
-    const contactRange = isEvangelist ? 46 : (commPriority === 'GO' ? 34 : 22);
+    // HK5-030: Evangelists actively seek outside targets.
+    // Generic believers DO NOT actively seek outside; they only engage in close incidental relationships.
+    // GO priority widens incidental range for generic believers and supercharges Evangelists.
+    const contactRange = isEvangelist ? (commPriority === 'GO' ? 52 : 44) : (commPriority === 'GO' ? 26 : 18);
 
     // Acquire new seeker targets up to the strict limit of 2 concurrent markings
-    if (canEngageSeekers && person.engagedSeekerIds.length < 2) {
+    if (person.engagedSeekerIds.length < 2) {
       for (const other of allPeople) {
         if (person.engagedSeekerIds.length >= 2) break;
         if (
@@ -248,7 +337,9 @@ export function calculatePersonSteering(
             }
           }
 
-          seeker.contactDuration += dt * synergy * openness * zoneRel;
+          // Evangelism rate reduced by 50% (전도율 50% 하향 조정)
+          const evangelismRateMultiplier = 0.5;
+          seeker.contactDuration += dt * evangelismRateMultiplier * synergy * openness * zoneRel;
           seeker.contactProgress = Math.min(100, (seeker.contactDuration / seeker.requiredContactDuration) * 100);
 
           // Update milestone stages (1: Interest/Dialogue, 2: Heart Opened, 3: Trust & Gospel)
@@ -287,18 +378,34 @@ export function calculatePersonSteering(
     switch (person.calling) {
       case 'EVANGELIST': {
         // High Outside Movement Frequency & Boundary Crossing
-        // Seeks external unconnected people or Open Doors using MapSystem target utility (TASK HK4-010)
+        // Evangelist actively visits individual souls outside, knocking on their doors/hearts ("개별 영혼들을 다니며 두드림")
+        // No trailing/following: the evangelist visits the seeker where they are!
         let externalTarget: Person | null = null;
         let highestUtilityScore = -Infinity;
 
-        for (const other of allPeople) {
-          if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
-            const d = distance(person.x, person.y, other.x, other.y);
-            const utility = mapSystem ? mapSystem.evaluateEvangelistTargetUtility(other, other.x, other.y, world.width, world.height, commPriority === 'GO') : 1;
-            const score = utility / Math.max(25, d);
-            if (score > highestUtilityScore) {
-              highestUtilityScore = score;
-              externalTarget = other;
+        // Maintain focus on current seeker if still uncontacted
+        const activeSeekerId = person.engagedSeekerIds?.[0];
+        if (activeSeekerId) {
+          const currentSeeker = allPeople.find(
+            p => p.id === activeSeekerId && p.isExternal && p.externalState !== 'CONTACTED' && p.externalState !== 'FOLLOWING'
+          );
+          if (currentSeeker) {
+            externalTarget = currentSeeker;
+          }
+        }
+
+        if (!externalTarget) {
+          for (const other of allPeople) {
+            if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
+              const d = distance(person.x, person.y, other.x, other.y);
+              const utility = mapSystem ? mapSystem.evaluateEvangelistTargetUtility(other, other.x, other.y, world.width, world.height, commPriority === 'GO') : 1;
+              // Add bonus for seekers already partially contacted so evangelist follows up
+              const progressBonus = (other.contactProgress || 0) * 0.8;
+              const score = (utility + progressBonus) / Math.max(20, d);
+              if (score > highestUtilityScore) {
+                highestUtilityScore = score;
+                externalTarget = other;
+              }
             }
           }
         }
@@ -307,13 +414,18 @@ export function calculatePersonSteering(
 
         if (externalTarget) {
           const d = distance(person.x, person.y, externalTarget.x, externalTarget.y);
-          if (d < commRadius * 3.5) {
-            // Evangelist steps out to meet external target
-            fx += ((externalTarget.x - person.x) / Math.max(1, d)) * 55 * goMultiplier;
-            fy += ((externalTarget.y - person.y) / Math.max(1, d)) * 55 * goMultiplier;
+          if (d > 22) {
+            // Evangelist walks over to visit the individual soul at their location
+            fx += ((externalTarget.x - person.x) / d) * 58 * goMultiplier;
+            fy += ((externalTarget.y - person.y) / d) * 58 * goMultiplier;
+          } else {
+            // Reached the individual soul: stay right beside them, knocking on their heart with the Gospel
+            const knockWobble = (person.wobbleOffset + performance.now() * 0.002) % (Math.PI * 2);
+            fx += Math.cos(knockWobble) * 6;
+            fy += Math.sin(knockWobble) * 6;
           }
         } else {
-          // Patrol between edge and outside
+          // Patrol outside seeking new souls
           const angle = (person.wobbleOffset + performance.now() * 0.0008) % (Math.PI * 2);
           const orbitR = commRadius * (0.85 + 0.5 * Math.sin(performance.now() * 0.0015));
           const ox = targetCenterX + Math.cos(angle) * orbitR;
@@ -329,7 +441,7 @@ export function calculatePersonSteering(
 
       case 'SHEPHERD': {
         // =========================================================================
-        // 2. Shepherd Pastoral Hold & Rescue: Holding onto leaving/cooling members (Req 2)
+        // 2. Shepherd Pastoral Hold & Rescue + Individual Fellowship/Visitation (개별 심방 & 교제)
         // =========================================================================
         let vulnerableTarget: Person | null = null;
         let highestNeed = 0;
@@ -346,11 +458,13 @@ export function calculatePersonSteering(
             if ((other.leaveIntent || 0) > 40) {
               score += 150 + (other.leaveIntent || 0);
             }
-            if (other.careStatus === 'UNCARED') score += 70;
-            if (other.need?.type === 'WEARY' || other.need?.type === 'TENSION') score += 65;
-            if (other.need?.type === 'NEWCOMER') score += 55;
-            if (other.stability < 45) score += 45;
-            if (dFromCenter > commRadius * 0.8) score += 35; // drifted to edge
+            if (other.careStatus === 'UNCARED') score += 75;
+            if (other.burnout > 30) score += 60 + other.burnout * 0.5;
+            if (other.need?.type === 'WEARY' || other.need?.type === 'TENSION') score += 55;
+            if (other.need?.type === 'NEWCOMER') score += 50;
+            if (other.stability < 60) score += 40 + (60 - other.stability);
+            if (person.careTargets?.includes(other.id)) score += 30; // shepherd's assigned flock member
+            if (dFromCenter > commRadius * 0.8) score += 25; // drifted to edge
 
             if (score > highestNeed) {
               highestNeed = score;
@@ -366,25 +480,33 @@ export function calculatePersonSteering(
           const d = distance(person.x, person.y, vulnerableTarget.x, vulnerableTarget.y);
           const isTargetLeaving = vulnerableTarget.movementState === 'LEAVING' || (vulnerableTarget.leaveIntent || 0) > 50;
 
-          // Shepherd rushes with pastoral urgency to rescue leaving sheep
-          const rushSpeed = isTargetLeaving ? 75 : (isOverloaded ? 65 : 50);
-          if (d > 15) {
+          // Shepherd rushes with pastoral urgency to rescue leaving sheep, or walks to visit member
+          const rushSpeed = isTargetLeaving ? 75 : (isOverloaded ? 60 : 48);
+          if (d > 16) {
             fx += ((vulnerableTarget.x - person.x) / d) * rushSpeed * careMultiplier;
             fy += ((vulnerableTarget.y - person.y) / d) * rushSpeed * careMultiplier;
           }
 
-          // Shepherd reaches the member: PASTORAL HOLD & EMBRACE (붙잡아주기)
+          // Shepherd reaches the member: PASTORAL HOLD & EMBRACE + INDIVIDUAL FELLOWSHIP (개별 심방 & 교제)
           if (d < 36) {
             // Actively hold onto the straying/leaving member!
             person.isHoldingPersonId = vulnerableTarget.id;
             person.holdingTimer = 0.6;
             vulnerableTarget.beingHeldById = person.id;
 
-            // Stop their outward drift and restore heart
-            vulnerableTarget.stability = Math.min(100, vulnerableTarget.stability + 24 * dt);
-            vulnerableTarget.trust = Math.min(100, vulnerableTarget.trust + 18 * dt);
-            vulnerableTarget.leaveIntent = Math.max(0, (vulnerableTarget.leaveIntent || 0) - 28 * dt);
-            vulnerableTarget.burnout = Math.max(0, vulnerableTarget.burnout - 15 * dt);
+            // HK5-053: Zone careMultiplier influences pastoral stabilization rate
+            let zoneCare = 1.0;
+            if (mapSystem && mapProfile) {
+              const zone = mapSystem.getZoneAt(person.x, person.y, world.width, world.height);
+              if (zone) zoneCare = zone.influence.careMultiplier;
+            }
+
+            // Continuous Pastoral Fellowship & Restoration
+            vulnerableTarget.stability = Math.min(100, vulnerableTarget.stability + 24 * dt * zoneCare);
+            vulnerableTarget.trust = Math.min(100, vulnerableTarget.trust + 18 * dt * zoneCare);
+            vulnerableTarget.leaveIntent = Math.max(0, (vulnerableTarget.leaveIntent || 0) - 28 * dt * zoneCare);
+            vulnerableTarget.burnout = Math.max(0, vulnerableTarget.burnout - 16 * dt * zoneCare);
+            vulnerableTarget.careStatus = 'CARED';
 
             // If the person had an expiring need, shepherd comforts and extends it
             if (vulnerableTarget.need) {
@@ -400,7 +522,6 @@ export function calculatePersonSteering(
                 vulnerableTarget.movementState = 'INSIDE';
                 vulnerableTarget.leavingTimer = undefined;
               }
-              vulnerableTarget.careStatus = 'CARED';
               vulnerableTarget.beingHeldById = null;
               person.isHoldingPersonId = null;
 
@@ -416,13 +537,13 @@ export function calculatePersonSteering(
           // No urgent crisis: patrol peacefully in and around flock
           person.isHoldingPersonId = null;
           const angle = (person.wobbleOffset + performance.now() * (isOverloaded ? 0.0012 : 0.0006)) % (Math.PI * 2);
-          const patrolRadius = commRadius * (0.8 + 0.6 * Math.sin(performance.now() * 0.0008));
+          const patrolRadius = commRadius * (0.7 + 0.5 * Math.sin(performance.now() * 0.0008));
           const ox = targetCenterX + Math.cos(angle) * patrolRadius;
           const oy = targetCenterY + Math.sin(angle) * patrolRadius;
           const od = distance(person.x, person.y, ox, oy);
           if (od > 5) {
-            fx += ((ox - person.x) / od) * 40 * careMultiplier;
-            fy += ((oy - person.y) / od) * 40 * careMultiplier;
+            fx += ((ox - person.x) / od) * 38 * careMultiplier;
+            fy += ((oy - person.y) / od) * 38 * careMultiplier;
           }
         }
         break;
@@ -473,36 +594,25 @@ export function calculatePersonSteering(
           }
         }
 
-        // If deception exists in community, Teacher reveals it!
+        // HK5-130: Teacher progressive Deception Discernment (no instant override!)
         if (comm.drift?.type === 'DECEPTION' && !comm.drift.discovered) {
-          comm.drift.discovered = true;
-          comm.drift.title = '거짓 교리 분별됨 (Deception Identified by Teacher)';
-          person.contribution.deceptionsExposed++;
+          const dToCenter = distance(person.x, person.y, targetCenterX, targetCenterY);
+          const proxBonus = dToCenter < commRadius ? 1.5 : 1.0;
+          const depthBonus = Math.max(0.6, person.depth / 50);
+          const rootBonus = commPriority === 'ROOT' ? 1.4 : 1.0;
+          const detectionRate = 18 * depthBonus * proxBonus * rootBonus;
+          comm.drift.detectionProgress = Math.min(100, (comm.drift.detectionProgress || 0) + detectionRate * dt);
+          if (comm.drift.detectionProgress >= 100) {
+            comm.drift.discovered = true;
+            comm.drift.title = '거짓 가르침 분별됨 (교사의 말씀 분별 완료)';
+            person.contribution.deceptionsExposed++;
+          }
         }
         break;
       }
 
       case 'INTERCESSOR': {
-        if (commPriority === 'GO') {
-          // In GO priority, Intercessors also seek external targets for mission
-          let externalTarget: Person | null = null;
-          let minD = Infinity;
-          for (const other of allPeople) {
-            if (other.isExternal && other.externalState !== 'FOLLOWING' && other.externalState !== 'CONTACTED') {
-              const d = distance(person.x, person.y, other.x, other.y);
-              if (d < minD) {
-                minD = d;
-                externalTarget = other;
-              }
-            }
-          }
-          if (externalTarget && minD < commRadius * 2.5) {
-            fx += ((externalTarget.x - person.x) / minD) * 45;
-            fy += ((externalTarget.y - person.y) / minD) * 45;
-            break; // Skip normal behavior
-          }
-        }
-
+        // HK5-030: Intercessors do not hunt outside seekers; they provide spiritual covering and crisis absorption
         // Crisis & Burnout absorption
         let crisisTarget: Person | null = null;
         let maxCrisis = 0;

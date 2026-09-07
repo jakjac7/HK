@@ -16,6 +16,21 @@ const ALL_CALLINGS: NonNullable<CallingType>[] = [
 
 export class CallingSystem {
   /**
+   * HK5-010: Strict Calling Gate
+   * Requires Gospel depth >= 68, ministry readiness >= 68, and discipleship formation >= 70%.
+   * Newcomers / unready members CANNOT acquire callings or bypass formation!
+   */
+  public static isEligibleForCalling(person: Person): boolean {
+    if (person.isExternal || person.calling !== null) return false;
+    // Founder members or mature disciples already established
+    if (person.isMatureDisciple) return true;
+    const depthReady = person.depth >= 68;
+    const readinessReady = person.readiness >= 68;
+    const formationReady = (person.formationProgress ?? 0) >= 70;
+    return depthReady && readinessReady && formationReady;
+  }
+
+  /**
    * Evaluates calling assignment using Soft RNG with protection against extreme shortages.
    * Section 3 & 4:
    * Base random = 80%

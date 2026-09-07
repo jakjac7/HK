@@ -15,7 +15,7 @@ export const WordSeedToast: React.FC<WordSeedToastProps> = ({ visible }) => {
     <div
       id="word-seed-toast"
       aria-live="polite"
-      className={`fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-700 ease-out flex items-center justify-center ${
+      className={`fixed top-32 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-700 ease-out flex items-center justify-center ${
         visible
           ? 'opacity-100 translate-y-0 scale-100'
           : 'opacity-0 -translate-y-3 scale-95'

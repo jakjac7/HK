@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { GameEngine } from '../simulation/engine';
-import { toStep10 } from '../utils/faithTerms';
+import { toFaithGrade5 } from '../utils/faithTerms';
 import { Trophy, RefreshCw, Eye, CheckCircle2, AlertTriangle, Users, GitBranch, HeartPulse } from 'lucide-react';
 
 interface ResultScreenProps {
@@ -16,6 +16,13 @@ interface ResultScreenProps {
 
 export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, onContinueWatching }) => {
   const { stats } = engine.state;
+
+  const finalGradeMeta = toFaithGrade5(stats.finalScore);
+  const autonomyGrade = toFaithGrade5(stats.autonomyScore);
+  const multiplicationGrade = toFaithGrade5(stats.multiplicationScore);
+  const healthGrade = toFaithGrade5(stats.kingdomHealthScore);
+  const gospelGrade = toFaithGrade5(stats.gospelIntegrityScore);
+  const reachGrade = toFaithGrade5(stats.reachScore);
 
   const gradeColors = {
     S: 'from-amber-300 via-yellow-400 to-amber-500 text-slate-950 border-amber-300',
@@ -32,7 +39,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
     >
       <div
         id="result-screen"
-        className="w-full max-w-lg max-h-[min(92vh,660px)] sm:max-h-[88vh] bg-[#121212] border border-white/15 rounded-md shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300"
+        className="w-full max-w-md max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212]/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300"
       >
         {/* Sticky Header with Grade Badge */}
         <div className="shrink-0 flex items-center justify-between border-b border-white/10 px-5 py-3.5 bg-[#161616]">
@@ -54,77 +61,125 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
 
         {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0 text-left">
-          {/* Total Score & 5 Criteria Breakdown in 1~10 Scale */}
+          {/* Total Score & 5 Criteria Breakdown in 5-Stage Abstract Scale */}
           <div className="bg-white/5 border border-white/10 rounded-sm p-4 flex flex-col gap-3">
-          <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
-            <span className="text-xs font-serif font-semibold text-white/60">종합 사역 성숙도</span>
-            <div className="flex items-baseline gap-2 font-mono">
-              <span className="text-2xl font-black text-amber-300">
-                {toStep10(stats.finalScore)}단계
-              </span>
-              <span className="text-xs text-white/40">
-                ({stats.finalScore} / 100점)
-              </span>
+            <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
+              <div>
+                <span className="text-xs font-serif font-semibold text-white/60">종합 사역 성숙도</span>
+                <p className="text-[10px] text-white/40 font-sans mt-0.5">영적 열매와 생명력 평가</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2.5 py-0.5 rounded-sm font-bold border ${finalGradeMeta.badge}`}>
+                  {finalGradeMeta.grade}
+                </span>
+                <span className="text-xs text-white/40 font-sans">
+                  ({finalGradeMeta.description})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs">
+              {/* Autonomy */}
+              <div>
+                <div className="flex justify-between items-center text-white/70 mb-1 font-serif text-[11px]">
+                  <span>자율 사역과 성령충만 (성령의 운행)</span>
+                  <span className={`font-bold text-[10px] px-1.5 py-0.2 rounded-xs border ${autonomyGrade.badge}`}>
+                    {autonomyGrade.grade}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(lvl => (
+                    <div
+                      key={lvl}
+                      className={`flex-1 h-full rounded-xs transition-all ${
+                        lvl <= autonomyGrade.level ? 'bg-violet-400' : 'bg-white/10'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Multiplication */}
+              <div>
+                <div className="flex justify-between items-center text-white/70 mb-1 font-serif text-[11px]">
+                  <span>공동체 분립 개척 (제자 재생산)</span>
+                  <span className={`font-bold text-[10px] px-1.5 py-0.2 rounded-xs border ${multiplicationGrade.badge}`}>
+                    {multiplicationGrade.grade}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(lvl => (
+                    <div
+                      key={lvl}
+                      className={`flex-1 h-full rounded-xs transition-all ${
+                        lvl <= multiplicationGrade.level ? 'bg-cyan-400' : 'bg-white/10'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Kingdom Health */}
+              <div>
+                <div className="flex justify-between items-center text-white/70 mb-1 font-serif text-[11px]">
+                  <span>몸의 건강도 (하나됨과 돌봄)</span>
+                  <span className={`font-bold text-[10px] px-1.5 py-0.2 rounded-xs border ${healthGrade.badge}`}>
+                    {healthGrade.grade}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(lvl => (
+                    <div
+                      key={lvl}
+                      className={`flex-1 h-full rounded-xs transition-all ${
+                        lvl <= healthGrade.level ? 'bg-emerald-400' : 'bg-white/10'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Gospel Integrity */}
+              <div>
+                <div className="flex justify-between items-center text-white/70 mb-1 font-serif text-[11px]">
+                  <span>복음의 순전함 (말씀과 진리 분별)</span>
+                  <span className={`font-bold text-[10px] px-1.5 py-0.2 rounded-xs border ${gospelGrade.badge}`}>
+                    {gospelGrade.grade}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(lvl => (
+                    <div
+                      key={lvl}
+                      className={`flex-1 h-full rounded-xs transition-all ${
+                        lvl <= gospelGrade.level ? 'bg-indigo-400' : 'bg-white/10'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Reach */}
+              <div>
+                <div className="flex justify-between items-center text-white/70 mb-1 font-serif text-[11px]">
+                  <span>선교적 접촉 (잃은 양을 향한 열정)</span>
+                  <span className={`font-bold text-[10px] px-1.5 py-0.2 rounded-xs border ${reachGrade.badge}`}>
+                    {reachGrade.grade}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(lvl => (
+                    <div
+                      key={lvl}
+                      className={`flex-1 h-full rounded-xs transition-all ${
+                        lvl <= reachGrade.level ? 'bg-amber-400' : 'bg-white/10'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-
-          <div className="flex flex-col gap-2.5 text-xs">
-            {/* Autonomy */}
-            <div>
-              <div className="flex justify-between text-white/70 mb-1 font-mono text-[11px]">
-                <span className="font-serif">자율 사역과 성령충만 (성령의 운행)</span>
-                <span className="font-bold text-violet-300">{toStep10(stats.autonomyScore)}단계 ({stats.autonomyScore}점)</span>
-              </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-400" style={{ width: `${stats.autonomyScore}%` }} />
-              </div>
-            </div>
-
-            {/* Multiplication */}
-            <div>
-              <div className="flex justify-between text-white/70 mb-1 font-mono text-[11px]">
-                <span className="font-serif">공동체 분립 개척 (제자 재생산)</span>
-                <span className="font-bold text-cyan-300">{toStep10(stats.multiplicationScore)}단계 ({stats.multiplicationScore}점)</span>
-              </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-cyan-400" style={{ width: `${stats.multiplicationScore}%` }} />
-              </div>
-            </div>
-
-            {/* Kingdom Health */}
-            <div>
-              <div className="flex justify-between text-white/70 mb-1 font-mono text-[11px]">
-                <span className="font-serif">몸의 건강도 (하나됨과 돌봄)</span>
-                <span className="font-bold text-emerald-300">{toStep10(stats.kingdomHealthScore)}단계 ({stats.kingdomHealthScore}점)</span>
-              </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-400" style={{ width: `${stats.kingdomHealthScore}%` }} />
-              </div>
-            </div>
-
-            {/* Gospel Integrity */}
-            <div>
-              <div className="flex justify-between text-white/70 mb-1 font-mono text-[11px]">
-                <span className="font-serif">복음의 순전함 (말씀과 진리 분별)</span>
-                <span className="font-bold text-indigo-300">{toStep10(stats.gospelIntegrityScore)}단계 ({stats.gospelIntegrityScore}점)</span>
-              </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-400" style={{ width: `${stats.gospelIntegrityScore}%` }} />
-              </div>
-            </div>
-
-            {/* Reach */}
-            <div>
-              <div className="flex justify-between text-white/70 mb-1 font-mono text-[11px]">
-                <span className="font-serif">선교적 접촉 (잃은 양을 향한 열정)</span>
-                <span className="font-bold text-amber-300">{toStep10(stats.reachScore)}단계 ({stats.reachScore}점)</span>
-              </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-400" style={{ width: `${stats.reachScore}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Milestone Numbers Grid */}
         <div className="grid grid-cols-4 gap-2 text-center">
@@ -203,13 +258,13 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
                 const data = {
                   finalGrade: stats.finalGrade,
                   finalScore: stats.finalScore,
-                  stepScale: {
-                    total: toStep10(stats.finalScore),
-                    autonomy: toStep10(stats.autonomyScore),
-                    multiplication: toStep10(stats.multiplicationScore),
-                    health: toStep10(stats.kingdomHealthScore),
-                    word: toStep10(stats.gospelIntegrityScore),
-                    reach: toStep10(stats.reachScore),
+                  faithGrades: {
+                    total: finalGradeMeta.grade,
+                    autonomy: autonomyGrade.grade,
+                    multiplication: multiplicationGrade.grade,
+                    health: healthGrade.grade,
+                    word: gospelGrade.grade,
+                    reach: reachGrade.grade,
                   },
                   scores: {
                     autonomy: stats.autonomyScore,
@@ -240,14 +295,14 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ engine, onRestart, o
             </button>
             <button
               onClick={() => {
-                const headers = 'Metric,RawScore,StepScale_1_to_10\n';
+                const headers = 'Metric,RawScore,Grade5\n';
                 const rows = [
-                  `FinalScore,${stats.finalScore},${toStep10(stats.finalScore)}`,
-                  `AutonomyScore,${stats.autonomyScore},${toStep10(stats.autonomyScore)}`,
-                  `MultiplicationScore,${stats.multiplicationScore},${toStep10(stats.multiplicationScore)}`,
-                  `KingdomHealthScore,${stats.kingdomHealthScore},${toStep10(stats.kingdomHealthScore)}`,
-                  `GospelIntegrityScore,${stats.gospelIntegrityScore},${toStep10(stats.gospelIntegrityScore)}`,
-                  `ReachScore,${stats.reachScore},${toStep10(stats.reachScore)}`,
+                  `FinalScore,${stats.finalScore},${finalGradeMeta.grade}`,
+                  `AutonomyScore,${stats.autonomyScore},${autonomyGrade.grade}`,
+                  `MultiplicationScore,${stats.multiplicationScore},${multiplicationGrade.grade}`,
+                  `KingdomHealthScore,${stats.kingdomHealthScore},${healthGrade.grade}`,
+                  `GospelIntegrityScore,${stats.gospelIntegrityScore},${gospelGrade.grade}`,
+                  `ReachScore,${stats.reachScore},${reachGrade.grade}`,
                   `PeopleReached,${stats.peopleReached},${stats.peopleReached}`,
                   `CommunitiesFormed,${stats.communitiesFormed},${stats.communitiesFormed}`,
                   `LeadersTrained,${stats.leadersTrained},${stats.leadersTrained}`,

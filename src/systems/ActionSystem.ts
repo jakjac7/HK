@@ -94,20 +94,25 @@ export class ActionSystem {
 
     switch (actionId) {
       case 'FELLOWSHIP': {
-        // Boosts trust & heals tensions
+        // Boosts trust & heals tensions (HK5-020: Global instant clear removed!)
         if (targetPerson) {
           targetPerson.trust = Math.min(100, targetPerson.trust + 25);
           targetPerson.stability = Math.min(100, targetPerson.stability + 15);
-          if (targetPerson.need?.type === 'TENSION') targetPerson.need = null;
+          if (targetPerson.need?.type === 'TENSION') {
+            targetPerson.need = null; // Only targeted fellowship completely heals specific tension
+          }
           specificMsg = `${targetPerson.name} 성도와 함께 식탁의 교제를 나누어 깊은 신뢰를 회복했습니다.`;
         } else {
           const trustGain = Math.round(15 * popScale);
           commMembers.forEach(p => {
             p.trust = Math.min(100, p.trust + trustGain);
-            if (p.need?.type === 'TENSION') p.need = null; // Heal community-wide tension
+            // HK5-020: Untargeted FELLOWSHIP softens/reduces TENSION duration but does NOT wipe it instantly!
+            if (p.need?.type === 'TENSION') {
+              p.need.duration = Math.max(5, p.need.duration - Math.round(20 * popScale));
+            }
           });
           community.stats.unity = Math.min(100, community.stats.unity + Math.round(10 * popScale));
-          specificMsg = '온 공동체가 함께 떡을 떼며 하나 됨의 기쁨을 누리고 갈등을 해소했습니다.';
+          specificMsg = '온 공동체가 함께 떡을 떼며 하나 됨의 기쁨을 나누고 관계의 긴장을 완화했습니다.';
         }
         break;
       }
@@ -119,12 +124,17 @@ export class ActionSystem {
         const readinessGain = Math.round(10 * popScale);
         const trustGain = Math.round(8 * popScale);
         const stabilityGain = Math.round(6 * popScale);
+        const formationProgressGain = Math.round((hasTeacher ? 18 : 12) * popScale);
 
         commMembers.forEach(p => {
           p.depth = Math.min(100, p.depth + depthGain);
           p.readiness = Math.min(100, p.readiness + readinessGain);
           p.trust = Math.min(100, p.trust + trustGain);
           p.stability = Math.min(100, p.stability + stabilityGain);
+          // HK5-100: Proclaiming the Word advances discipleship formation progress
+          if (!p.calling) {
+            p.formationProgress = Math.min(100, (p.formationProgress || 0) + formationProgressGain);
+          }
           p.visualEffect = { type: 'WORD', timer: 4.0 };
         });
 
@@ -180,7 +190,17 @@ export class ActionSystem {
           };
         }
 
-        targetPerson.stability = Math.min(100, targetPerson.stability + 32);
+        const wasLeaving = targetPerson.movementState === 'LEAVING';
+        const leaveReason = targetPerson.leavingReason;
+        if (wasLeaving) {
+          targetPerson.movementState = 'INSIDE';
+          targetPerson.leavingTimer = undefined;
+          targetPerson.leavingReason = undefined;
+          targetPerson.beingHeldById = null;
+        }
+
+        targetPerson.stability = Math.min(100, targetPerson.stability + (wasLeaving ? 45 : 32));
+        targetPerson.trust = Math.min(100, targetPerson.trust + (wasLeaving ? 30 : 15));
         targetPerson.leaveIntent = 0;
         if (targetPerson.careStatus === 'UNCARED') targetPerson.careStatus = 'CARED';
         
@@ -188,19 +208,32 @@ export class ActionSystem {
         if (hasShepherd) {
           // Shepherd helps co-care for 1 nearby uncared or weary person
           const nearbyUncared = commMembers.find(
-            p => p.id !== targetPerson.id && (p.careStatus === 'UNCARED' || p.burnout > 45 || p.need !== null)
+            p => p.id !== targetPerson.id && (p.careStatus === 'UNCARED' || p.burnout > 45 || p.need !== null || p.movementState === 'LEAVING')
           );
           if (nearbyUncared) {
+            if (nearbyUncared.movementState === 'LEAVING') {
+              nearbyUncared.movementState = 'INSIDE';
+              nearbyUncared.leavingTimer = undefined;
+              nearbyUncared.leavingReason = undefined;
+              nearbyUncared.beingHeldById = null;
+            }
             nearbyUncared.burnout = Math.max(0, nearbyUncared.burnout - 25);
-            nearbyUncared.stability = Math.min(100, nearbyUncared.stability + 20);
+            nearbyUncared.stability = Math.min(100, nearbyUncared.stability + 25);
+            nearbyUncared.trust = Math.min(100, nearbyUncared.trust + 20);
+            nearbyUncared.leaveIntent = 0;
             nearbyUncared.careStatus = 'CARED';
-            if (nearbyUncared.need?.type === 'WEARY') nearbyUncared.need = null;
+            if (nearbyUncared.need) nearbyUncared.need = null;
             nearbyUncared.visualEffect = { type: 'CARE', timer: 4.0 };
-            shepherdAssistedMsg = ` (목자가 인근의 ${nearbyUncared.name} 성도도 함께 돌보았습니다)`;
+            shepherdAssistedMsg = ` (목자가 인근의 ${nearbyUncared.name} 성도도 함께 붙잡고 돌보았습니다)`;
           }
         }
 
-        if (targetPerson.need?.type === 'QUESTION') {
+        if (wasLeaving) {
+          targetPerson.burnout = Math.max(0, targetPerson.burnout - 35);
+          targetPerson.need = null;
+          targetPerson.visualEffect = { type: 'CARE', timer: 6.0 };
+          specificMsg = `[지체 붙잡음] ${targetPerson.name} 성도를 긴급 심방하여 이탈 위기(${leaveReason || '갈등과 번민'})에서 따뜻하게 붙잡았습니다!${shepherdAssistedMsg}`;
+        } else if (targetPerson.need?.type === 'QUESTION') {
           // Personal pastoral visitation resolves spiritual doubt / lack of conviction
           targetPerson.need = null;
           targetPerson.depth = Math.min(100, targetPerson.depth + 25);

@@ -144,7 +144,8 @@ export class CareSystem {
       // If left uncared until leaveIntent is high, enter visible LEAVING state
       if ((target.leaveIntent || 0) >= 68 && target.movementState !== 'LEAVING' && target.movementState !== 'SENT' && target.movementState !== 'CRISIS') {
         target.movementState = 'LEAVING';
-        target.leavingTimer = 25; // 25s grace period for shepherd to intervene
+        target.leavingTimer = 50; // 50s grace period to hold them
+        target.leavingReason = target.leavingReason || '장기 돌봄 부재와 소외감';
       } else if (target.movementState !== 'SENT' && target.movementState !== 'CRISIS' && target.movementState !== 'LEAVING') {
         target.movementState = 'EDGE';
       }

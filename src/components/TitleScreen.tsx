@@ -73,7 +73,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   return (
     <div
       id="title-screen-container"
-      className="fixed inset-0 w-full h-[100dvh] overflow-hidden bg-[#0A0D14] text-[#F5F5F5] select-none flex flex-col justify-between p-3 sm:p-6"
+      className="fixed inset-0 w-full h-full max-h-screen overflow-hidden bg-[#0A0D14] text-[#F5F5F5] select-none flex flex-col justify-between p-3 sm:p-6"
     >
       {/* Background Ambience / Subtle Grid Pattern */}
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-slate-950/80 to-[#0A0D14] z-0" />

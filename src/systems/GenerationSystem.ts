@@ -60,8 +60,11 @@ export class GenerationSystem {
   }
 
   /**
-   * Computes Transmission for new community (Section 45)
-   * New Community State = Source Community 60% + Sent Leader 40%
+   * Computes Transmission for new community (HK5-110)
+   * 1. Inherited Dimensions (60% Source Community + 40% Sent Leader):
+   *    - Formation, Integrity, Care Culture, Resilience
+   * 2. Reformed by New Environment:
+   *    - Mission, Unity, Clarity (shaped by fresh planting zeal and context)
    */
   public static computeTransmission(
     sourceCommunity: Community,
@@ -69,18 +72,26 @@ export class GenerationSystem {
   ): Partial<Community['stats']> {
     const s = sourceCommunity.stats;
 
-    const leaderFormationFactor = leader.depth;
-    const leaderCareFactor = leader.stability;
-    const leaderResilienceFactor = leader.trust;
+    // 1. Four Core Inherited Dimensions (strictly 60/40)
+    const inheritedFormation = Math.round(s.formation * 0.6 + leader.depth * 0.4);
+    const leaderIntegrity = leader.depth > 70 ? 85 : 65;
+    const inheritedIntegrity = Math.round(s.integrity * 0.6 + leaderIntegrity * 0.4);
+    const inheritedCare = Math.round(s.care * 0.6 + leader.stability * 0.4);
+    const inheritedResilience = Math.round(s.resilience * 0.6 + leader.trust * 0.4);
+
+    // 2. Reformed by New Environment & Fresh Planting Zeal
+    const freshMissionZeal = leader.calling === 'EVANGELIST' ? 80 : 65;
+    const freshUnity = 70;
+    const freshClarity = 65;
 
     return {
-      formation: Math.round(s.formation * 0.6 + leaderFormationFactor * 0.4),
-      care: Math.round(s.care * 0.6 + leaderCareFactor * 0.4),
-      resilience: Math.round(s.resilience * 0.6 + leaderResilienceFactor * 0.4),
-      clarity: Math.round(s.clarity * 0.7 + 20),
-      unity: Math.round(s.unity * 0.6 + 30),
-      mission: Math.round(s.mission * 0.6 + 30),
-      integrity: Math.round(s.integrity * 0.7 + (leader.depth > 70 ? 25 : 15)),
+      formation: inheritedFormation,
+      integrity: inheritedIntegrity,
+      care: inheritedCare,
+      resilience: inheritedResilience,
+      mission: freshMissionZeal,
+      unity: freshUnity,
+      clarity: freshClarity,
     };
   }
 }

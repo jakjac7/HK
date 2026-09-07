@@ -9,6 +9,7 @@ import { drawOrganicBlob } from '../simulation/communityBlob';
 import { CALLING_DEFINITIONS } from '../data/callings';
 import { Person, NeedType, PersonNeed, Community } from '../types';
 import { Cross, Plus, Minus, Focus } from 'lucide-react';
+import { categorizeZoneId, ZONE_STAGE_SPOTS, calculateSpotCoordinate } from '../systems/RoutineSystem';
 
 interface SimulationCanvasProps {
   engine: GameEngine;
@@ -18,6 +19,7 @@ interface SimulationCanvasProps {
   activeCardId?: string | null;
   onApplyActionOnPerson?: (targetPersonId: string) => void;
   onApplyCardOnPerson?: (targetPersonId: string) => void;
+  focusedPersonId?: string | null;
 }
 
 export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
@@ -28,6 +30,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   activeCardId,
   onApplyActionOnPerson,
   onApplyCardOnPerson,
+  focusedPersonId,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -150,6 +153,19 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     },
     [engine]
   );
+
+  // Center camera on focused person if requested
+  useEffect(() => {
+    if (focusedPersonId) {
+      const person = engine.state.people.find(p => p.id === focusedPersonId);
+      if (person) {
+        const cam = cameraRef.current;
+        cam.targetX = person.x;
+        cam.targetY = person.y;
+        cam.targetZoom = 1.35;
+      }
+    }
+  }, [focusedPersonId, engine]);
 
   // Convert screen coordinates to world coordinates accounting for camera
   const screenToWorld = useCallback(
@@ -488,7 +504,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         <button
           id="recenter-community-alert-btn"
           onClick={() => centerOnCommunity()}
-          className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-400 text-black px-4 py-1.5 rounded-full font-serif text-xs font-bold shadow-[0_0_20px_rgba(251,191,36,0.6)] border border-amber-300 flex items-center gap-2 animate-bounce cursor-pointer z-20"
+          className="absolute top-28 left-1/2 -translate-x-1/2 bg-amber-400 text-black px-4 py-1.5 rounded-full font-serif text-xs font-bold shadow-[0_0_20px_rgba(251,191,36,0.6)] border border-amber-300 flex items-center gap-2 animate-bounce cursor-pointer z-20"
         >
           <Focus className="w-3.5 h-3.5" />
           <span>우리 공동체 찾기 ({engine.state.communities[0]?.name})</span>
@@ -497,63 +513,74 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
       {/* Targeting Prompt */}
       {(activeActionId || activeCardId) && (
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 bg-amber-400 text-black font-mono font-semibold px-4 py-1 rounded-full border border-amber-300 text-xs shadow-[0_4px_20px_rgba(251,191,36,0.4)] pointer-events-none animate-pulse z-20">
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 bg-amber-400 text-black font-mono font-semibold px-4 py-1 rounded-full border border-amber-300 text-xs shadow-[0_4px_20px_rgba(251,191,36,0.4)] pointer-events-none animate-pulse z-20">
           지체를 탭하여 사역을 행하세요
         </div>
       )}
 
-      {/* Community Quick Navigator Chips (Top-Left) */}
-      <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
+      {/* Left Side Community Vertical List (화면 좌측 행배치) */}
+      <div className="absolute top-28 left-3.5 z-20 flex flex-col items-start gap-1.5 max-w-[180px] pointer-events-auto">
+        <div className="text-[10px] font-serif font-bold text-white/50 tracking-wider uppercase px-1 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80 inline-block" />
+          <span>공동체</span>
+        </div>
         {engine.state.communities.map(c => (
           <button
             key={c.id}
             id={`comm-nav-${c.id}`}
             onClick={() => centerOnCommunity(c.id)}
-            className="bg-black/80 hover:bg-black text-white/90 border border-white/20 hover:border-amber-400/60 px-2.5 py-1 rounded-sm text-[11px] font-serif flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 backdrop-blur-md"
+            title={`${c.name} (클릭 시 화면 이동)`}
+            className="bg-black/85 hover:bg-black text-white/90 hover:text-amber-200 border border-white/15 hover:border-amber-400/70 px-2.5 py-1.5 rounded-md text-xs font-serif flex items-center gap-2 shadow-lg cursor-pointer transition-all active:scale-95 backdrop-blur-md w-full justify-between group"
           >
-            <span
-              className="w-2 h-2 rounded-full inline-block"
-              style={{ backgroundColor: c.colorBase }}
-            />
-            <span className="font-medium">{c.name}</span>
-            <span className="text-[10px] font-mono text-white/40">({c.stats.population})</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-white/30"
+                style={{ backgroundColor: c.colorBase }}
+              />
+              <span className="font-medium truncate text-white/90 group-hover:text-amber-300">
+                {c.name}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-amber-400/90 px-1 py-0.5 bg-white/5 rounded shrink-0 whitespace-nowrap">
+              {c.stats.population}명
+            </span>
           </button>
         ))}
       </div>
 
-      {/* Floating Geometric Balance Controls (Top-Right): Recenter & Zoom */}
-      <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+      {/* Map Controls (중심, 확대, 축소) - 화면 우측하단 배치 */}
+      <div className="absolute bottom-4 right-3.5 z-20 flex items-center gap-1.5 pointer-events-auto">
         <button
           id="recenter-btn"
           onClick={() => centerOnCommunity()}
           title="공동체 화면 중앙 맞추기"
-          className="bg-black/80 hover:bg-black text-amber-300 border border-white/20 hover:border-amber-400/60 px-2.5 py-1.5 rounded-sm flex items-center gap-1 text-xs font-mono shadow-md cursor-pointer transition-all active:scale-95 backdrop-blur-md"
+          className="bg-black/90 hover:bg-black text-amber-300 border border-white/20 hover:border-amber-400/70 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-mono shadow-xl cursor-pointer transition-all active:scale-95 backdrop-blur-md"
         >
-          <Cross className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-[11px] font-medium">중심</span>
+          <Cross className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="text-[11px] font-medium whitespace-nowrap">중심</span>
         </button>
 
-        <div className="flex items-center border border-white/20 rounded-sm overflow-hidden bg-black/80 backdrop-blur-md">
+        <div className="flex items-center border border-white/20 rounded-md overflow-hidden bg-black/90 backdrop-blur-md shadow-xl">
           <button
             id="zoom-in-btn"
             onClick={() => {
               const cam = cameraRef.current;
               cam.targetZoom = Math.min(2.0, cam.targetZoom * 1.25);
             }}
-            title="확대"
-            className="w-7 h-7 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 active:scale-95 cursor-pointer text-xs"
+            title="화면 확대"
+            className="w-8 h-7.5 flex items-center justify-center text-white/80 hover:text-amber-300 hover:bg-white/10 active:scale-95 cursor-pointer text-xs"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
-          <div className="w-px h-4 bg-white/15" />
+          <div className="w-px h-4 bg-white/20" />
           <button
             id="zoom-out-btn"
             onClick={() => {
               const cam = cameraRef.current;
               cam.targetZoom = Math.max(0.6, cam.targetZoom * 0.8);
             }}
-            title="축소"
-            className="w-7 h-7 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 active:scale-95 cursor-pointer text-xs"
+            title="화면 축소"
+            className="w-8 h-7.5 flex items-center justify-center text-white/80 hover:text-amber-300 hover:bg-white/10 active:scale-95 cursor-pointer text-xs"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
@@ -574,6 +601,23 @@ function drawBackgroundAmbience(
   communities: Community[]
 ) {
   ctx.save();
+
+  // Refined modern dot grid
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  const gridSize = 40;
+  // Calculate bounds to fill screen regardless of camera
+  const startX = Math.floor((camX - w / 2) / gridSize) * gridSize;
+  const endX = startX + w + gridSize * 2;
+  const startY = Math.floor((camY - h / 2) / gridSize) * gridSize;
+  const endY = startY + h + gridSize * 2;
+
+  for (let x = startX; x < endX; x += gridSize) {
+    for (let y = startY; y < endY; y += gridSize) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   // For each community, draw sacred concentric orbit rings & symmetrical crosshairs
   for (const comm of communities) {
@@ -641,13 +685,33 @@ function drawMapZones(
 
   ctx.save();
   for (const zone of zones) {
+    const stage = categorizeZoneId(zone.id);
     const pulse = 0.5 + 0.5 * Math.sin(time * 0.001 + zone.x * 0.01);
-    
+
+    // Thematic visual styling per routine zone
+    let themeRgb = '56, 189, 248';
+    let stageIcon = '📍';
+    let stageTitle = zone.name;
+
+    if (stage === 'CAFE') {
+      themeRgb = '245, 158, 11'; // Warm amber/terracotta
+      stageIcon = '☕';
+    } else if (stage === 'WORK_CAMPUS') {
+      themeRgb = '56, 189, 248'; // Intellect cerulean
+      stageIcon = '📚';
+    } else if (stage === 'RESIDENCE') {
+      themeRgb = '52, 211, 153'; // Emerald/sage
+      stageIcon = '🏡';
+    } else if (stage === 'TRANSIT') {
+      themeRgb = '168, 85, 247'; // Metro lilac
+      stageIcon = '🚇';
+    }
+
     // Zone radial ambient fill
     const grad = ctx.createRadialGradient(zone.x, zone.y, 0, zone.x, zone.y, zone.radius);
-    grad.addColorStop(0, 'rgba(56, 189, 248, 0.04)');
-    grad.addColorStop(0.75, 'rgba(56, 189, 248, 0.02)');
-    grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    grad.addColorStop(0, `rgba(${themeRgb}, 0.07)`);
+    grad.addColorStop(0.75, `rgba(${themeRgb}, 0.02)`);
+    grad.addColorStop(1, `rgba(${themeRgb}, 0)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
@@ -657,19 +721,88 @@ function drawMapZones(
     ctx.beginPath();
     ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
     ctx.setLineDash([6, 8]);
-    ctx.strokeStyle = `rgba(148, 163, 184, ${0.12 + pulse * 0.06})`;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(${themeRgb}, ${0.22 + pulse * 0.08})`;
+    ctx.lineWidth = 1.2;
     ctx.stroke();
     ctx.setLineDash([]);
 
+    // Draw spot landmarks inside this zone (cafe tables, study desks, benches)
+    const spots = ZONE_STAGE_SPOTS[stage] || [];
+    for (let i = 0; i < spots.length; i++) {
+      const spotCoord = calculateSpotCoordinate(zone, i, spots.length);
+      ctx.save();
+      if (stage === 'CAFE') {
+        // Cafe wooden/glass round table
+        ctx.beginPath();
+        ctx.arc(spotCoord.x, spotCoord.y, 9, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.08)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.32)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.font = '7.5px sans-serif';
+        ctx.fillStyle = 'rgba(253, 230, 138, 0.65)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('☕', spotCoord.x, spotCoord.y);
+      } else if (stage === 'WORK_CAMPUS') {
+        // Library study desk / lecture bench
+        ctx.beginPath();
+        ctx.rect(spotCoord.x - 7, spotCoord.y - 4.5, 14, 9);
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.font = '7px sans-serif';
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.65)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📖', spotCoord.x, spotCoord.y);
+      } else if (stage === 'RESIDENCE') {
+        // Dormitory room / garden bench
+        ctx.beginPath();
+        ctx.arc(spotCoord.x, spotCoord.y, 7.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.07)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.26)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.font = '7px sans-serif';
+        ctx.fillStyle = 'rgba(167, 243, 208, 0.6)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🪑', spotCoord.x, spotCoord.y);
+      } else {
+        // Transit hub marker
+        ctx.beginPath();
+        ctx.arc(spotCoord.x, spotCoord.y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(168, 85, 247, 0.08)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.26)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.font = '7px sans-serif';
+        ctx.fillStyle = 'rgba(233, 213, 255, 0.6)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('✦', spotCoord.x, spotCoord.y);
+      }
+      ctx.restore();
+    }
+
     // Zone Title and Influence badge (subtle display at top of zone)
     ctx.font = '600 11px "JetBrains Mono", monospace';
-    ctx.fillStyle = 'rgba(203, 213, 225, 0.6)';
+    ctx.fillStyle = `rgba(${themeRgb}, 0.92)`;
     ctx.textAlign = 'center';
-    ctx.fillText(`📍 ${zone.name}`, zone.x, zone.y - zone.radius + 16);
+    ctx.fillText(`${stageIcon} ${stageTitle}`, zone.x, zone.y - zone.radius + 16);
 
     ctx.font = '400 9px "JetBrains Mono", monospace';
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.45)';
+    ctx.fillStyle = 'rgba(203, 213, 225, 0.6)';
     ctx.fillText(
       `이동 ${zone.influence.speedMultiplier}x · 관계 ${zone.influence.relationshipMultiplier}x`,
       zone.x,
@@ -821,9 +954,41 @@ function drawPersonNode(
   }
 
   if (p.isExternal) {
-    baseHue = 210;
-    baseSat = 15;
-    baseLight = 35;
+    if (p.routine) {
+      switch (p.routine.stage) {
+        case 'CAFE':
+          baseHue = 32; // Warm caramel amber
+          baseSat = 68;
+          baseLight = 58;
+          break;
+        case 'WORK_CAMPUS':
+          baseHue = 208; // Clear intellect cerulean
+          baseSat = 65;
+          baseLight = 56;
+          break;
+        case 'RESIDENCE':
+          baseHue = 155; // Cozy living mint/sage
+          baseSat = 52;
+          baseLight = 50;
+          break;
+        case 'TRANSIT':
+          baseHue = 265; // Modern transit lilac
+          baseSat = 58;
+          baseLight = 62;
+          break;
+      }
+    } else {
+      baseHue = 210;
+      baseSat = 45;
+      baseLight = 58;
+    }
+
+    // If receiving gospel contact, warm up with radiant illumination
+    if ((p.contactProgress || 0) > 0) {
+      const progFactor = Math.min(1, (p.contactProgress || 0) / 100);
+      baseLight = Math.min(78, baseLight + progFactor * 12);
+      baseSat = Math.min(88, baseSat + progFactor * 12);
+    }
   }
 
   // If person has a need, gray them out and darken them based on how chronic it is
@@ -873,6 +1038,23 @@ function drawPersonNode(
     }
   }
 
+  // Visual celebration aura for calling discovery
+  if (!p.isExternal && p.revealGlowTimer && p.revealGlowTimer > 0) {
+    const pulse = 1 + Math.sin(time * 0.015) * 0.2;
+    const alpha = Math.min(1, p.revealGlowTimer / 1.5);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (radius + 9) * pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(251, 191, 36, ${alpha * 0.9})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (radius + 15) * pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(251, 191, 36, ${alpha * 0.4})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
   // Visual cue for LEAVING / COOLING persons (Req 2)
   if (!p.isExternal && p.movementState === 'LEAVING') {
     ctx.save();
@@ -901,18 +1083,20 @@ function drawPersonNode(
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Urgent Leaving Countdown badge
-      const timerSec = Math.max(0, Math.ceil(p.leavingTimer || 25));
+      // Urgent Leaving Countdown badge with reason
+      const timerSec = Math.max(0, Math.ceil(p.leavingTimer || 50));
       ctx.fillStyle = '#ef4444';
       ctx.font = 'bold 9px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`❄️ 이탈 위기 (${timerSec}s)`, p.x, p.y - radius - 14);
+      const reasonTag = p.leavingReason ? `[${p.leavingReason}] ` : '';
+      ctx.fillText(`🚨 ${reasonTag}붙잡기 (${timerSec}s)`, p.x, p.y - radius - 14);
 
       // Mini timer bar
-      const barW = 28;
-      const barH = 3;
-      const pct = (p.leavingTimer || 25) / 25;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      const barW = 34;
+      const barH = 3.5;
+      const maxTime = 50;
+      const pct = (p.leavingTimer || maxTime) / maxTime;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
       ctx.fillRect(p.x - barW / 2, p.y - radius - 8, barW, barH);
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(p.x - barW / 2, p.y - radius - 8, barW * Math.max(0, Math.min(1, pct)), barH);
@@ -1088,15 +1272,78 @@ function drawPersonNode(
     drawNeedSignal(ctx, p.x, p.y - radius - 10, p.need, time);
   }
 
+  // Social Conversation bubble between table companions
+  if (p.isExternal && p.routine?.partnerId && p.routine.isDwelling) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 0.003 + p.x);
+    ctx.save();
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.75 + pulse * 0.25})`;
+    ctx.fillText('💬', p.x + 8, p.y - radius - 10);
+    ctx.restore();
+  }
+
+  // Routine Activity Tag / Icon for external persons
+  if (p.isExternal && p.routine) {
+    ctx.save();
+    if (isSelected) {
+      const label = `${p.routine.activityIcon} ${p.routine.activityLabel}`;
+      ctx.font = 'bold 9.5px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
+      const textWidth = ctx.measureText(label).width;
+      const tagW = textWidth + 16;
+      const tagH = 20;
+      const tagX = p.x - tagW / 2;
+      const tagY = p.y - radius - 26;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(tagX, tagY, tagW, tagH, 4);
+      } else {
+        ctx.rect(tagX, tagY, tagW, tagH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, p.x, tagY + tagH / 2);
+    } else {
+      // Crisp mini-badge above head indicating active routine
+      const badgeY = p.y - radius - 8;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.routine.activityIcon, p.x, badgeY);
+
+      // Stride walking indicator when traveling between zones
+      if (!p.routine.isDwelling) {
+        const strideBob = Math.sin((p.routine.walkPhase || 0)) * 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y + radius + 4 + strideBob, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   // Draw Name Text beneath node (Clean display typography)
   ctx.font = '500 11px "Plus Jakarta Sans", "Noto Sans KR", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = p.isExternal
-    ? 'rgba(148, 163, 184, 0.7)'
+    ? 'rgba(203, 213, 225, 0.85)'
     : isSelected
     ? '#ffffff'
     : 'rgba(226, 232, 240, 0.9)';
-  ctx.fillText(p.name, p.x, p.y + radius + 12);
+  const displayName = p.isExternal && p.routine?.personaTitle
+    ? `${p.name} (${p.routine.personaTitle})`
+    : p.name;
+  ctx.fillText(displayName, p.x, p.y + radius + 12);
 
   ctx.restore();
 }

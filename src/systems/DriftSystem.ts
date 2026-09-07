@@ -19,69 +19,49 @@ export const SOCIETAL_NEWS_DATABASE: Record<
 > = {
   DECEPTION: [
     {
-      headline: '[사상 풍조] 자극적인 거짓 가르침과 혼란스러운 교리 확산… 성도 분별력 경보',
-      impactDescription: '순전한 복음의 기초가 약화된 틈을 타 왜곡된 사상이 공동체를 위협합니다. 교사의 말씀 양육(ROOT)이 시급합니다.',
+      headline: '[사상 풍조] 공동체 주변에 왜곡된 정보와 잘못된 소문이 퍼지고 있습니다',
+      impactDescription: '순전한 복음의 기초가 약화된 틈을 타 왜곡된 사상이 공동체를 위협합니다. 교사의 말씀 양육(ROOT)이 필요합니다.',
       category: 'CULT',
     },
     {
-      headline: '[미디어 징후] SNS발 왜곡된 종말론과 자의적 성경 해석 범람… 영적 혼란 가중',
-      impactDescription: '성도들의 복음적 분별력이 흔들리고 있습니다. 생명의 말씀 선포로 진리의 기준을 바로 세워야 합니다.',
-      category: 'CULT',
-    },
-    {
-      headline: '[시대 경보] 기복주의와 세속적 가치관의 유혹 확산 조짐… 신앙의 본질 시험대',
-      impactDescription: '복음의 깊이가 얕아질수록 왜곡된 가르침에 쉽게 노출됩니다. 기초를 굳건히 다져야 합니다.',
+      headline: '[분별 경보] 기초가 흔들리는 틈을 타 오해와 잘못된 생각이 싹틉니다',
+      impactDescription: '성도들의 복음적 분별력이 시험받고 있습니다. 생명의 말씀 선포로 진리의 기준을 바로 세워야 합니다.',
       category: 'CULT',
     },
   ],
   BURNOUT: [
     {
-      headline: '[경제 환경] 지속되는 고물가와 극심한 생계 압박… 지체들의 만성 피로와 탈진 심화',
-      impactDescription: '과도한 업무와 경제적 부담으로 피로가 누적되고 있습니다. 쉼과 치유의 심방(CARE)이 절실합니다.',
+      headline: '[피로 누적] 분주한 일상과 짐 속에서 사람들의 누적된 피로가 깊어지고 있습니다',
+      impactDescription: '쉼과 기도가 부족하여 성도들이 탈진에 이르고 있습니다. 쉼과 치유의 심방(CARE)이 절실합니다.',
       category: 'ECONOMY',
     },
     {
-      headline: '[사회 피로] 성과 경쟁과 휴식의 부재… "더 이상 버틸 힘이 없다" 번아웃 증후군 확산',
-      impactDescription: '지친 심령들이 기도의 손을 놓고 있습니다. 중보기도(PRAYER)와 목자의 따뜻한 위로가 필요합니다.',
-      category: 'ECONOMY',
-    },
-    {
-      headline: '[사역 경보] 지속된 돌봄 부담 누적으로 일꾼들의 영적 에너지 급격히 고갈',
-      impactDescription: '사역의 짐을 함께 나누고 은혜의 보좌 앞으로 나아가 새 힘을 얻어야 합니다.',
+      headline: '[사역 경보] 지속된 돌봄 부담 누적으로 일꾼들의 마음과 힘이 고갈되고 있습니다',
+      impactDescription: '사역의 짐을 함께 나누고 합심 기도(PRAYER)를 통해 새 힘을 얻어야 합니다.',
       category: 'ECONOMY',
     },
   ],
   DIVISION: [
     {
-      headline: '[사회 갈등] 사회적 편가르기와 불신 풍조의 여파… 공동체 내부로 번지는 관계 균열',
-      impactDescription: '불통과 오해로 성도 간의 신뢰에 금이 가고 있습니다. 따뜻한 식탁의 교제(FELLOWSHIP)가 절실합니다.',
+      headline: '[관계 경보] 관계의 오해와 소외감이 방치되어 마음의 거리가 멀어지고 있습니다',
+      impactDescription: '돌봄의 공백과 마음의 상처를 방치하면 분열이 깊어집니다. 따뜻한 식탁의 교제(FELLOWSHIP)가 필요합니다.',
       category: 'POLITICS',
     },
     {
-      headline: '[관계 경보] 소외감과 미해결된 긴장이 쌓이며 지체들 사이에 보이지 않는 벽 형성',
-      impactDescription: '돌봄의 공백과 마음의 상처를 방치하면 분열의 골이 깊어집니다. 사랑의 결속이 필요합니다.',
-      category: 'POLITICS',
-    },
-    {
-      headline: '[소통 부재] 세대 간 시선의 차이와 대화 단절… 하나 됨의 위기 직면',
-      impactDescription: '소외된 지체들의 아픔을 품지 못하면 화평이 깨어집니다. 그리스도 안에서 한 몸 됨을 회복해야 합니다.',
+      headline: '[불신 조짐] 작은 오해와 소통 부재가 성도들 사이에 보이지 않는 벽을 만듭니다',
+      impactDescription: '소외된 이웃들의 아픔을 품지 못하면 화평이 깨어집니다. 사랑과 격려로 하나 됨을 지켜야 합니다.',
       category: 'POLITICS',
     },
   ],
   APATHY: [
     {
-      headline: '[세속 풍조] 안락함에 안주하는 개인주의 만연… 이웃을 향한 관심과 복음의 열정 식어감',
-      impactDescription: '영혼을 향한 애통함을 잃어버리고 있습니다. 온전한 예배(WORSHIP)로 가슴을 뜨겁게 달구어야 합니다.',
+      headline: '[정체 경보] 공동체 내부의 안락함에 안주하여 밖을 향한 선교적 관심이 줄어들고 있습니다',
+      impactDescription: '영혼을 향한 사랑의 온도가 식어가고 있습니다. 선교적 시선(GO)과 온전한 예배(WORSHIP)가 필요합니다.',
       category: 'SECULARISM',
     },
     {
-      headline: '[영적 냉담] 분주한 일상 속에 영적 무관심과 침체가 공동체 전반으로 침투',
-      impactDescription: '교제에 활력이 사라지고 성장이 멈추어 가고 있습니다. 선교적 시선(GO)으로 지경을 넓혀야 합니다.',
-      category: 'SECULARISM',
-    },
-    {
-      headline: '[정체 경보] "우리끼리만 평안하면 그만"… 영적 안일함과 선교적 야성의 실종 경고',
-      impactDescription: '세상으로 나아가는 생명력을 잃으면 물이 고여 썩게 됩니다. 복음의 야성을 깨워야 합니다.',
+      headline: '[활력 저하] 익숙한 울타리 안에서 영적 무관심과 정체가 서서히 퍼지고 있습니다',
+      impactDescription: '세상으로 나아가는 생명력을 회복하고 새로운 이웃을 향해 나아가야 합니다.',
       category: 'SECULARISM',
     },
   ],
@@ -303,7 +283,8 @@ export class DriftSystem {
         if (leavingCandidate && leavingCandidate.movementState !== 'LEAVING') {
           leavingCandidate.movementState = 'LEAVING';
           leavingCandidate.leaveIntent = 75;
-          leavingCandidate.leavingTimer = 25; // 25 second grace period for shepherds
+          leavingCandidate.leavingTimer = 50; // 50 second grace period to hold them
+          leavingCandidate.leavingReason = `사조 위기(${drift.title})로 인한 신앙 동요`;
         }
       }
 

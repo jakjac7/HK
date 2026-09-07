@@ -53,13 +53,13 @@ export const SocietalNewsTicker: React.FC<SocietalNewsTickerProps> = ({ news, on
   return (
     <div
       id="societal-news-ticker"
-      className="absolute top-14 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-3xl pointer-events-auto animate-in slide-in-from-top-4 duration-300"
+      className="w-full max-w-3xl pointer-events-auto animate-in slide-in-from-top-2 duration-300"
     >
       <div
-        className={`flex items-start sm:items-center justify-between gap-3 p-3 rounded-md border backdrop-blur-md shadow-2xl ${categoryMeta.color}`}
+        className={`flex items-start sm:items-center justify-between gap-3 p-2.5 sm:p-3 rounded-md border backdrop-blur-md shadow-2xl ${categoryMeta.color}`}
       >
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="relative flex items-center justify-center p-1.5 rounded-full bg-white/10">
+          <div className="relative flex items-center justify-center p-1.5 rounded-full bg-white/10 shrink-0">
             <Radio className="w-4 h-4 text-amber-400 animate-pulse" />
             <span className="absolute -top-1 -right-1 flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -67,14 +67,14 @@ export const SocietalNewsTicker: React.FC<SocietalNewsTickerProps> = ({ news, on
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 shrink-0">
             <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-bold uppercase tracking-wider border ${categoryMeta.badge}`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-bold uppercase tracking-wider border whitespace-nowrap ${categoryMeta.badge}`}
             >
-              <Icon className="w-3 h-3" />
+              <Icon className="w-3 h-3 shrink-0" />
               {categoryMeta.label}
             </span>
-            <span className="text-[10px] font-mono text-white/50">
+            <span className="text-[10px] font-mono text-white/70 whitespace-nowrap">
               {news.severity === 'HIGH' ? '🔴 긴급 경보' : '🟡 예고 관측'} · {secondsLeft}초
             </span>
           </div>

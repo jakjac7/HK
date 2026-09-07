@@ -14,9 +14,15 @@ interface SendModalProps {
   engine: GameEngine;
   onClose: () => void;
   onSend: (leaderId: string, directionOrZone: string, coords?: { x: number; y: number }) => void;
+  initialLeaderId?: string | null;
 }
 
-export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend }) => {
+export const SendModal: React.FC<SendModalProps> = ({
+  engine,
+  onClose,
+  onSend,
+  initialLeaderId,
+}) => {
   const { communities, people } = engine.state;
   const primaryComm = communities[0];
   const mapProfile = engine.mapSystem.getMapProfile();
@@ -32,7 +38,9 @@ export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend })
   );
 
   const [selectedLeaderId, setSelectedLeaderId] = useState<string>(
-    qualifiedLeaders[0]?.id || ''
+    initialLeaderId && qualifiedLeaders.some(l => l.id === initialLeaderId)
+      ? initialLeaderId
+      : qualifiedLeaders[0]?.id || ''
   );
   const [selectedDest, setSelectedDest] = useState<string>(
     zones[0]?.id || 'EAST'
@@ -66,7 +74,7 @@ export const SendModal: React.FC<SendModalProps> = ({ engine, onClose, onSend })
       <div
         id="send-modal"
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-md max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212] border border-white/15 rounded-md shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="w-full max-w-md max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212]/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Sticky Top Header */}
         <div className="shrink-0 flex items-center justify-between border-b border-white/10 px-4 py-3 bg-[#161616]">

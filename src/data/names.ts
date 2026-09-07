@@ -102,3 +102,48 @@ export class NameGenerator {
     }
   }
 }
+
+/**
+ * 성경적 및 초기 교회의 도시/지명 기반 공동체 명칭 풀
+ */
+export const COMMUNITY_NAME_POOL: string[] = [
+  '안디옥 공동체',
+  '빌립보 공동체',
+  '에베소 공동체',
+  '데살로니가 공동체',
+  '베뢰아 공동체',
+  '고린도 공동체',
+  '골로새 공동체',
+  '서머나 공동체',
+  '버가모 공동체',
+  '두아디라 공동체',
+  '사데 공동체',
+  '라오디게아 공동체',
+  '예루살렘 공동체',
+  '갈릴리 공동체',
+  '벧엘 공동체',
+  '엠마오 공동체',
+  '헤브론 공동체',
+  '시온 공동체',
+  '실로 공동체',
+  '가버나움 공동체',
+  '다메섹 공동체',
+  '욥바 공동체',
+  '마케도니아 공동체',
+  '로마 공동체',
+  '아테네 공동체',
+  '드로아 공동체',
+];
+
+/**
+ * 중복을 피해 무작위 공동체 이름을 반환하는 함수
+ */
+export function getRandomCommunityName(excludeNames: string[] = []): string {
+  const available = COMMUNITY_NAME_POOL.filter(name => !excludeNames.includes(name));
+  if (available.length > 0) {
+    return available[Math.floor(Math.random() * available.length)];
+  }
+  // 풀이 모두 소진되었을 경우 안전한 인덱스 접미사 부여
+  const base = COMMUNITY_NAME_POOL[Math.floor(Math.random() * COMMUNITY_NAME_POOL.length)];
+  return `${base.replace(' 공동체', '')} ${excludeNames.length + 1} 공동체`;
+}

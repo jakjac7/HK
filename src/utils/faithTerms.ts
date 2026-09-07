@@ -5,7 +5,7 @@
 import { Generation, NeedType, CallingType } from '../types';
 
 /**
- * 0~100 수치를 직관적인 1~10단계 척도로 단순화 변환
+ * 0~100 수치를 직관적인 1~10단계 척도로 단순화 변환 (호환용)
  */
 export function toStep10(val: number): number {
   if (isNaN(val) || val <= 0) return 1;
@@ -14,11 +14,90 @@ export function toStep10(val: number): number {
 }
 
 /**
- * 1~10단계 문자열 포맷
+ * 1~10단계 문자열 포맷 (호환용)
  */
 export function formatStep10(val: number, showMax: boolean = true): string {
   const step = toStep10(val);
   return showMax ? `${step} / 10단계` : `${step}단계`;
+}
+
+/**
+ * 영성지수 및 능력치 5단계 질적 추상화 (매우나쁨 · 나쁨 · 보통 · 좋음 · 아주좋음)
+ */
+export type FaithGrade5 = '매우나쁨' | '나쁨' | '보통' | '좋음' | '아주좋음';
+
+export interface FaithGradeMeta {
+  grade: FaithGrade5;
+  level: number;       // 1 ~ 5
+  color: string;       // 텍스트 색상
+  badge: string;       // 뱃지 배경 + 테두리 + 텍스트
+  barColor: string;    // 게이지 채움 색상
+  gaugeWidth: string;  // 게이지 % 폭
+  description: string; // 친절한 성경적 영적 상태 설명
+}
+
+/**
+ * 0~100 수치를 5단계 질적 상태로 변환
+ * @param val 0 ~ 100 사이의 수치
+ * @param inverted true인 경우(예: 피로/소진도), 수치가 높을수록 상태가 나쁨
+ */
+export function toFaithGrade5(val: number, inverted: boolean = false): FaithGradeMeta {
+  const raw = isNaN(val) ? 0 : Math.max(0, Math.min(100, val));
+  const score = inverted ? (100 - raw) : raw;
+
+  if (score <= 20) {
+    return {
+      grade: '매우나쁨',
+      level: 1,
+      color: 'text-rose-400',
+      badge: 'bg-rose-500/15 text-rose-300 border-rose-500/40',
+      barColor: 'bg-rose-500',
+      gaugeWidth: '20%',
+      description: inverted ? '심각한 영적 탈진 (쉼과 중보가 절실합니다)' : '심각한 결핍과 돌봄이 시급한 상태',
+    };
+  }
+  if (score <= 40) {
+    return {
+      grade: '나쁨',
+      level: 2,
+      color: 'text-orange-400',
+      badge: 'bg-orange-500/15 text-orange-300 border-orange-500/40',
+      barColor: 'bg-orange-400',
+      gaugeWidth: '40%',
+      description: inverted ? '피로 누적 중 (안식과 양육이 필요합니다)' : '보살핌과 말씀 양육이 필요한 상태',
+    };
+  }
+  if (score <= 60) {
+    return {
+      grade: '보통',
+      level: 3,
+      color: 'text-amber-300',
+      badge: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+      barColor: 'bg-amber-400',
+      gaugeWidth: '60%',
+      description: inverted ? '평이한 활력 (무리 없는 상태)' : '완만하게 자라나고 있는 상태',
+    };
+  }
+  if (score <= 80) {
+    return {
+      grade: '좋음',
+      level: 4,
+      color: 'text-emerald-300',
+      badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+      barColor: 'bg-emerald-400',
+      gaugeWidth: '80%',
+      description: inverted ? '충분한 쉼과 평안' : '건강하고 든든하게 성숙한 상태',
+    };
+  }
+  return {
+    grade: '아주좋음',
+    level: 5,
+    color: 'text-cyan-300',
+    badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40',
+    barColor: 'bg-cyan-400',
+    gaugeWidth: '100%',
+    description: inverted ? '온전한 안식과 성령의 충만함' : '생명력이 충만하고 풍성한 열매를 맺는 상태',
+  };
 }
 
 /**

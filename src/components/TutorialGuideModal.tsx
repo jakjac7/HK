@@ -23,7 +23,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
       <div
         id="tutorial-guide-modal"
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-lg max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212] border border-white/15 rounded-md shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-md max-h-[min(90vh,620px)] sm:max-h-[85vh] bg-[#121212]/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl text-[#F5F5F5] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
       >
         {/* Sticky Header */}
         <div className="shrink-0 flex flex-col gap-3 border-b border-white/10 px-4 py-3 bg-[#161616]">
@@ -121,7 +121,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
         {activeTab === 'FLOW' && (
           <div className="flex flex-col gap-3 text-xs">
             <p className="text-white/70 leading-relaxed text-[11px] font-serif">
-              HIS KINGDOM은 단순한 수치 조작 게임이 아닙니다. 화면의 유기적 파동과 색채는 그리스도의 몸 된 공동체 안에서 역사하는 성령의 생명력을 시각적으로 표현합니다. (모든 능력치는 1~10단계로 성장합니다)
+              HIS KINGDOM은 단순한 수치 조작 게임이 아닙니다. 화면의 유기적 파동과 색채는 그리스도의 몸 된 공동체 안에서 역사하는 성령의 생명력을 시각적으로 표현합니다. (모든 영적 지표는 매우나쁨 · 나쁨 · 보통 · 좋음 · 아주좋음 5단계 상태로 질적 표현됩니다)
             </p>
 
             <div className="grid grid-cols-1 gap-2">
@@ -129,7 +129,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
                 <BookOpen className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-serif font-bold text-indigo-300 text-xs">
-                    말씀 (WORD) → 복음의 농도가 깊어짐 (1~10단계)
+                    말씀 (WORD) → 복음의 농도가 깊어짐 (5단계 질적 상태)
                   </div>
                   <p className="text-[11px] text-white/70 mt-0.5 font-sans leading-relaxed">
                     말씀: 성도색 농도가 아니라 복음의 농도가 깊어짐을 의미합니다. 교사의 말씀 양육을 통해 지체의 영혼 속에 십자가 복음의 진리가 깊이 뿌리내려 거짓 가르침을 분별하는 장성한 제자로 자라납니다.
@@ -141,7 +141,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
                 <Heart className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-serif font-bold text-emerald-300 text-xs">
-                    돌봄 (CARE) → 사랑의 섬김과 정착 (1~10단계)
+                    돌봄 (CARE) → 사랑의 섬김과 정착 (5단계 질적 상태)
                   </div>
                   <p className="text-[11px] text-white/70 mt-0.5 font-sans leading-relaxed">
                     목자가 경계 외곽의 낙심한 영혼을 찾아 심방하고 사랑으로 품어, 시험에 든 지체가 다시 공동체의 따스한 품으로 안착하도록 돕습니다.
@@ -153,7 +153,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
                 <Sparkles className="w-4 h-4 text-pink-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-serif font-bold text-pink-300 text-xs">
-                    예배 (WORSHIP) → 거룩한 임재와 감격 (1~10단계)
+                    예배 (WORSHIP) → 거룩한 임재와 감격 (5단계 질적 상태)
                   </div>
                   <p className="text-[11px] text-white/70 mt-0.5 font-sans leading-relaxed">
                     예배자가 온 맘 다해 찬양할 때 흩어진 지체들의 시선이 주님께 모이며, 하나님 나라의 거룩한 임재와 영적 감격이 뚜렷해집니다.
@@ -165,7 +165,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
                 <Flame className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-serif font-bold text-amber-300 text-xs">
-                    기도 (PRAYER) → 은혜의 품과 시험 이김 (1~10단계)
+                    기도 (PRAYER) → 은혜의 품과 시험 이김 (5단계 질적 상태)
                   </div>
                   <p className="text-[11px] text-white/70 mt-0.5 font-sans leading-relaxed">
                     중보기도자가 영적 시험과 탈진의 자리에서 무릎 꿇어 부르짖음으로써, 공동체가 찢어지지 않고 더 많은 영혼을 품는 은혜의 수용력을 넓힙니다.
@@ -177,7 +177,7 @@ export const TutorialGuideModal: React.FC<TutorialGuideModalProps> = ({ onClose 
                 <Compass className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-serif font-bold text-cyan-300 text-xs">
-                    선교 (MISSION) → 잃은 양을 향한 발걸음 (1~10단계)
+                    선교 (MISSION) → 잃은 양을 향한 발걸음 (5단계 질적 상태)
                   </div>
                   <p className="text-[11px] text-white/70 mt-0.5 font-sans leading-relaxed">
                     전도자가 복음의 울타리를 넘어 세상 속 잃은 양에게 나아가 주님의 사랑을 전하고 새가족으로 품어 들입니다.

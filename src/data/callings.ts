@@ -63,7 +63,7 @@ export const CALLING_DEFINITIONS: Record<NonNullable<CallingType>, CallingInfo> 
     bgLight: 'bg-indigo-500/15 border-indigo-500/30',
     description: '생명의 말씀을 가르쳐 복음의 농도를 깊어지게 하고, 거짓 가르침과 왜곡된 생각을 분별하여 지킵니다.',
     movementProfile: '지체들과 일대일 및 소그룹으로 성경을 상고하며 진리를 나눔',
-    visualEffect: '말씀: 성도색 농도가 아니라 복음의 농도가 깊어짐을 의미합니다 (1~10단계 성장)',
+    visualEffect: '말씀: 성도색 농도가 아니라 복음의 농도가 깊어짐을 의미합니다 (5단계 질적 성장)',
     strategicRole: '말씀 양육과 진리 분별 수호',
     riskIfImbalanced: '교사 부재 시 거짓 가르침(미혹)에 흔들리기 쉬움',
   },
