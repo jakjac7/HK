@@ -83,9 +83,9 @@ export function calculatePersonSteering(
   const commPriority: CommunityPriority = comm ? comm.priority : 'ROOT';
 
   // 1. Separation force (avoid overlapping with neighbors)
-  // For dwelling external people, we use gentle, cozy separation so companions can sit at tables together!
+  // Incorporate physical radius and explicit margin for strong physical repulsion
   const isDwelling = person.isExternal && person.routine?.isDwelling;
-  const separationRadius = isDwelling ? 24 : (person.isExternal ? 32 : 44);
+  const margin = isDwelling ? 4 : (person.isExternal ? 12 : 20);
   let sepX = 0;
   let sepY = 0;
   let sepCount = 0;
@@ -93,9 +93,21 @@ export function calculatePersonSteering(
   for (const other of allPeople) {
     if (other.id === person.id) continue;
     const d = distance(person.x, person.y, other.x, other.y);
+    const minDist = person.radius + other.radius + margin;
+    const separationRadius = minDist * 1.6;
+
     if (d > 0 && d < separationRadius) {
-      const push = (separationRadius - d) / separationRadius;
-      const pushMult = isDwelling ? 36 : (person.isExternal ? 75 : 150);
+      let push = 0;
+      if (d < minDist) {
+        // Strong repulsion when violating minimum distance (physical overlap + margin)
+        // Force scales up sharply to quickly resolve overlap
+        push = 1.0 + ((minDist - d) / minDist) * 4.0; 
+      } else {
+        // Soft linear cushion before they hit the margin
+        push = (separationRadius - d) / (separationRadius - minDist);
+      }
+      
+      const pushMult = isDwelling ? 25 : (person.isExternal ? 60 : 130);
       sepX += ((person.x - other.x) / d) * push * pushMult;
       sepY += ((person.y - other.y) / d) * push * pushMult;
       sepCount++;
